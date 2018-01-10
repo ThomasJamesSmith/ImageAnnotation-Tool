@@ -1,0 +1,23 @@
+<!DOCTYPE RCC><RCC version="1.0">
+    <qresource>
+        <file alias="close.png">icons/close.png</file>
+        <file alias="open.png">icons/open.png</file>
+		<file alias="WindowIcon.png">icons/WindowIcon.png</file>
+		<file alias="done.png">icons/done.png</file>
+		<file alias="file.png">icons/file.png</file>
+		<file alias="save.png">icons/save.png</file>
+		<file alias="zoom-in.png">icons/zoom-in.png</file>
+		<file alias="zoom-out.png">icons/zoom-out.png</file>
+		<file alias="cursor.png">icons/cursor.png</file>
+		<file alias="hide.png">icons/hide.png</file>
+		<file alias="delete.png">icons/delete.png</file>
+		<file alias="rectangle.png">icons/rectangle.png</file>
+		<file alias="ellipse.png">icons/ellipse.png</file>
+		<file alias="polygon.png">icons/polygon.png</file>
+		<file alias="flood-fill.png">icons/flood-fill.png</file>
+		<file alias="writing.png">icons/writing.png</file>
+		<file alias="undo.png">icons/undo.png</file>
+		<file alias="help.png">icons/help.png</file>
+		<file alias="helpabout.png">icons/helpabout.png</file>
+    </qresource>
+</RCC>
