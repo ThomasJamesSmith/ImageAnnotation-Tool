@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__(parent)
 
         self.image = QImage()
+        self.video = QMovie()
 
         self.cvimage = None         # Original image
         self.outputMask = None      # Output image
@@ -515,19 +516,77 @@ class MainWindow(QMainWindow):
         """Open a file with file dialog"""
         if not self.okToContinue():
             return
-
+			
         dir = os.path.dirname(self.filename) \
                 if self.filename is not None else "."
-        formats = ["*.%s" % unicode(format).lower() \
+        img_formats = ["*.%s" % unicode(format).lower() \
                    for format in QImageReader.supportedImageFormats()]
+				   
+        vid_formats = ["*.%s" % unicode(format).lower() \
+                   for format in QMovie.supportedFormats()]
+				   
+        vid_formats = [u'*.mp4']
         fname = unicode(QFileDialog.getOpenFileName(self,
                             "Image Annotation Tool - Choose Image", dir,
-                            "Image files (%s)" % " ".join(formats)))
-        if fname:
+                            "Image files (%s) ;; Video files (%s)" % (" ".join(img_formats), " ".join(vid_formats))))
+        if fname.endswith(".mp4"):
+            self.fileListWidget.clear()
+            self.loadVideo(fname)
+            #self.updateToolBar()
+        else:
             self.fileListWidget.clear()
             self.loadImage(fname)
             self.updateToolBar()
 
+    def loadVideo(self, fname=None):
+		fsplit = fname.split("/")
+		nsplit = fsplit[len(fsplit)-1].split(".")
+		fsplit[len(fsplit)-1]=nsplit[0]
+		dirname="/".join(fsplit) + "/"
+		
+		msg = "Do you want to reverse the video?"
+		reply = QMessageBox.question(self, 'Message',
+						msg, QMessageBox.Yes, QMessageBox.No)
+
+		reverse = True if QMessageBox.Yes else False
+
+		if not os.path.exists(dirname):
+			os.makedirs(dirname)
+			
+			vidcap = cv2.VideoCapture(fname)
+			success,image = vidcap.read()
+			success = True
+			frames = []
+			while success:
+				success,image = vidcap.read()
+				
+				if reverse:
+					frames.insert(0,image)
+				else:
+					frames.insert(len(frames),image)
+					
+			for i in range(0, len(frames)-1):
+				cv2.imwrite(dirname + "%05d.jpg" % i, frames[i])
+		
+		if dirname:
+			self.updateStatus("Open directory: %s" % dirname)
+			self.filepath = dirname
+			self.allImages = self.scanAllImages(dirname)
+			self.fileListWidget.clear()
+			for imgPath in self.allImages:
+				filename = os.path.basename(imgPath)
+				item = QListWidgetItem(filename)
+				self.fileListWidget.addItem(item)
+
+			if len(self.allImages) > 0:
+				self.updateStatus("Open directory: %s" % dirname)
+				self.loadImage(self.allImages[0])
+				self.updateToolBar()
+				self.colorListWidget(self.allImages[0])
+			else:
+				QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
+		
+	
 
     def loadImage(self, fname=None):
         """Load the newest image"""
