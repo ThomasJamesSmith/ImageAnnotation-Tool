@@ -547,18 +547,29 @@ class MainWindow(QMainWindow):
 						msg, QMessageBox.Yes, QMessageBox.No)
 
 		reverse = True if reply == QMessageBox.Yes else False
-
 		
-		if not os.path.exists(dirname):
+		useDir = True
+		if os.path.exists(dirname):
+			msg = "Directory already exists. Do you want to use current existing directory? Warning could overwrite existing data!"
+			reply = QMessageBox.question(self, 'Warning! Directory Exists',
+							msg, QMessageBox.Yes, QMessageBox.No)
+			useDir = True if reply == QMessageBox.Yes else False
+			if useDir:
+				self.updateStatus("Directory used: %s" % dirname)
+		else:
 			os.makedirs(dirname)
-			
+			self.updateStatus("Directory created: %s" % dirname)
+		
+		if useDir:
 			vidcap = cv2.VideoCapture(fname)
 			success,image = vidcap.read()
 			success = True
 			frames = []
 			while success:
 				success,image = vidcap.read()
-				frames.insert(len(frames),image)
+				if success:
+					image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
+					frames.insert(len(frames),image2)
 			
 			start = 0
 			end = len(frames)-1
@@ -576,6 +587,9 @@ class MainWindow(QMainWindow):
 			for i in range(start, end, step):
 				cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
 				name += 1
+		else:
+			self.updateStatus("Action stopped: Please rename file.")
+			return
 		
 		if dirname:
 			self.updateStatus("Open directory: %s" % dirname)
