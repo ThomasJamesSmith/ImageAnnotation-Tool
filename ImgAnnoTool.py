@@ -430,7 +430,7 @@ class MainWindow(QMainWindow):
             print "Noting to save"
             return
 
-        output = cv2.cvtColor(self.outputMask, cv2.cv.CV_RGB2BGR)
+        output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2BGR)
         cv2.imwrite(config.outputFile(self.filename).decode('utf-8').encode('gbk'), output)
         self.updateStatus("Save to %s" % config.outputFile(self.filename))
         self.setClean()
@@ -530,9 +530,7 @@ class MainWindow(QMainWindow):
                             "Image Annotation Tool - Choose Image", dir,
                             "Image files (%s) ;; Video files (%s)" % (" ".join(img_formats), " ".join(vid_formats))))
         if fname.endswith(".mp4"):
-            self.fileListWidget.clear()
             self.loadVideo(fname)
-            #self.updateToolBar()
         else:
             self.fileListWidget.clear()
             self.loadImage(fname)
@@ -548,8 +546,9 @@ class MainWindow(QMainWindow):
 		reply = QMessageBox.question(self, 'Message',
 						msg, QMessageBox.Yes, QMessageBox.No)
 
-		reverse = True if QMessageBox.Yes else False
+		reverse = True if reply == QMessageBox.Yes else False
 
+		
 		if not os.path.exists(dirname):
 			os.makedirs(dirname)
 			
@@ -559,14 +558,24 @@ class MainWindow(QMainWindow):
 			frames = []
 			while success:
 				success,image = vidcap.read()
-				
-				if reverse:
-					frames.insert(0,image)
-				else:
-					frames.insert(len(frames),image)
-					
-			for i in range(0, len(frames)-1):
-				cv2.imwrite(dirname + "%05d.jpg" % i, frames[i])
+				frames.insert(len(frames),image)
+			
+			start = 0
+			end = len(frames)-1
+			step = 1
+			name = 0;
+			
+			if reverse:
+				self.updateStatus("Video Reversed")
+				start = end-1
+				end = -1
+				step = -1
+			else:		
+				self.updateStatus("Video Not Reversed")
+			
+			for i in range(start, end, step):
+				cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
+				name += 1
 		
 		if dirname:
 			self.updateStatus("Open directory: %s" % dirname)
@@ -629,8 +638,8 @@ class MainWindow(QMainWindow):
                 for action, check in self.resetableActions:
                     action.setChecked(check)
                 # Convert to RGB color space
-                cv2.cvtColor(self.cvimage, cv2.cv.CV_BGR2RGB, self.cvimage)
-                cv2.cvtColor(self.outputMask, cv2.cv.CV_BGR2RGB, self.outputMask)
+                cv2.cvtColor(self.cvimage, cv2.COLOR_BGR2RGB, self.cvimage)
+                cv2.cvtColor(self.outputMask, cv2.COLOR_BGR2RGB, self.outputMask)
                 self.isLoading = True
                 self.showImage()
                 self.filename = fname
