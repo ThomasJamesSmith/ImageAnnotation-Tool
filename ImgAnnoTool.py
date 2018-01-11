@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__(parent)
 
         self.image = QImage()
+        self.video = QMovie()
 
         self.cvimage = None         # Original image
         self.outputMask = None      # Output image
@@ -429,7 +430,7 @@ class MainWindow(QMainWindow):
             print "Noting to save"
             return
 
-        output = cv2.cvtColor(self.outputMask, cv2.cv.CV_RGB2BGR)
+        output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2BGR)
         cv2.imwrite(config.outputFile(self.filename).decode('utf-8').encode('gbk'), output)
         self.updateStatus("Save to %s" % config.outputFile(self.filename))
         self.setClean()
@@ -515,19 +516,86 @@ class MainWindow(QMainWindow):
         """Open a file with file dialog"""
         if not self.okToContinue():
             return
-
+			
         dir = os.path.dirname(self.filename) \
                 if self.filename is not None else "."
-        formats = ["*.%s" % unicode(format).lower() \
+        img_formats = ["*.%s" % unicode(format).lower() \
                    for format in QImageReader.supportedImageFormats()]
+				   
+        vid_formats = ["*.%s" % unicode(format).lower() \
+                   for format in QMovie.supportedFormats()]
+				   
+        vid_formats = [u'*.mp4']
         fname = unicode(QFileDialog.getOpenFileName(self,
                             "Image Annotation Tool - Choose Image", dir,
-                            "Image files (%s)" % " ".join(formats)))
-        if fname:
+                            "Image files (%s) ;; Video files (%s)" % (" ".join(img_formats), " ".join(vid_formats))))
+        if fname.endswith(".mp4"):
+            self.loadVideo(fname)
+        else:
             self.fileListWidget.clear()
             self.loadImage(fname)
             self.updateToolBar()
 
+    def loadVideo(self, fname=None):
+		fsplit = fname.split("/")
+		nsplit = fsplit[len(fsplit)-1].split(".")
+		fsplit[len(fsplit)-1]=nsplit[0]
+		dirname="/".join(fsplit) + "/"
+		
+		msg = "Do you want to reverse the video?"
+		reply = QMessageBox.question(self, 'Message',
+						msg, QMessageBox.Yes, QMessageBox.No)
+
+		reverse = True if reply == QMessageBox.Yes else False
+
+		
+		if not os.path.exists(dirname):
+			os.makedirs(dirname)
+			
+			vidcap = cv2.VideoCapture(fname)
+			success,image = vidcap.read()
+			success = True
+			frames = []
+			while success:
+				success,image = vidcap.read()
+				frames.insert(len(frames),image)
+			
+			start = 0
+			end = len(frames)-1
+			step = 1
+			name = 0;
+			
+			if reverse:
+				self.updateStatus("Video Reversed")
+				start = end-1
+				end = -1
+				step = -1
+			else:		
+				self.updateStatus("Video Not Reversed")
+			
+			for i in range(start, end, step):
+				cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
+				name += 1
+		
+		if dirname:
+			self.updateStatus("Open directory: %s" % dirname)
+			self.filepath = dirname
+			self.allImages = self.scanAllImages(dirname)
+			self.fileListWidget.clear()
+			for imgPath in self.allImages:
+				filename = os.path.basename(imgPath)
+				item = QListWidgetItem(filename)
+				self.fileListWidget.addItem(item)
+
+			if len(self.allImages) > 0:
+				self.updateStatus("Open directory: %s" % dirname)
+				self.loadImage(self.allImages[0])
+				self.updateToolBar()
+				self.colorListWidget(self.allImages[0])
+			else:
+				QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
+		
+	
 
     def loadImage(self, fname=None):
         """Load the newest image"""
@@ -570,8 +638,8 @@ class MainWindow(QMainWindow):
                 for action, check in self.resetableActions:
                     action.setChecked(check)
                 # Convert to RGB color space
-                cv2.cvtColor(self.cvimage, cv2.cv.CV_BGR2RGB, self.cvimage)
-                cv2.cvtColor(self.outputMask, cv2.cv.CV_BGR2RGB, self.outputMask)
+                cv2.cvtColor(self.cvimage, cv2.COLOR_BGR2RGB, self.cvimage)
+                cv2.cvtColor(self.outputMask, cv2.COLOR_BGR2RGB, self.outputMask)
                 self.isLoading = True
                 self.showImage()
                 self.filename = fname
