@@ -183,7 +183,9 @@ class MainWindow(QMainWindow):
         self.floodFillAction = self.createAction("&Flood\nFill", self.setFloodFillAction, "Ctrl+F",
                                                  "flood-fill", "Apply flood-fill to selected area", True, "toggled(bool)")
         self.floodFillAction.setEnabled(False)
-
+		############################################
+        self.superpixelAction = self.createAction("&Superpixel", self.helpAbout, "Alt+s", "superpixel", "Run superpixel Algorithm")
+		############################################
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
 
@@ -257,7 +259,7 @@ class MainWindow(QMainWindow):
         self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, None,
                                  self.paletteAction, self.confirmAction, self.deleteAction,
                                  self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
-                                 self.ellipseLabelAction, self.polygonLabelAction)
+                                 self.ellipseLabelAction, self.polygonLabelAction,None, self.superpixelAction)
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_2)
@@ -510,8 +512,6 @@ class MainWindow(QMainWindow):
                 self.loadImage(filename)
                 self.colorListWidget(filename)
 
-
-
     def fileOpen(self):
         """Open a file with file dialog"""
         if not self.okToContinue():
@@ -760,8 +760,14 @@ class MainWindow(QMainWindow):
         self.updateStatus("Undo")
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
-
-
+			
+	def runSuperpixelAlg(self):
+		"""Run Superpixel Algorithm on the current Image"""
+		tom = 24
+		jess = 23
+		total = tom + jess
+		print("here")
+			
     def hideOriginalImage(self):
         """Hide original image and only show """
         if self.hideOriginalAction.isChecked():
