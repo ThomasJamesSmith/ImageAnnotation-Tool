@@ -5,6 +5,13 @@
 # Sys requirement: Linux / Windows 7 / OS X 10.8 or later versions
 # Package requirement: PyQt 4 / OpenCv 2 / numpy
 
+#
+#   use the segments from sp as overlay
+#   np.where(a == 1)
+#   can select a segment, when selected search sp_img for all occurences of label
+#   selected pixels are then added to the mask
+#   have option to remove segment from mask
+#
 
 import os
 import platform
@@ -15,6 +22,9 @@ import cv2
 import config
 from colorDialog import *
 from FloodFillConfig import *
+from skimage.segmentation import slic
+from skimage.segmentation import mark_boundaries
+from skimage import io
 import sip
 # RECOMMAND: Use PyQt4
 try:
@@ -183,9 +193,9 @@ class MainWindow(QMainWindow):
         self.floodFillAction = self.createAction("&Flood\nFill", self.setFloodFillAction, "Ctrl+F",
                                                  "flood-fill", "Apply flood-fill to selected area", True, "toggled(bool)")
         self.floodFillAction.setEnabled(False)
-		############################################
-        self.superpixelAction = self.createAction("&Superpixel", self.helpAbout, "Alt+s", "superpixel", "Run superpixel Algorithm")
-		############################################
+        
+        self.superpixelAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel", "Run superpixel Algorithm")
+        
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
 
@@ -516,15 +526,15 @@ class MainWindow(QMainWindow):
         """Open a file with file dialog"""
         if not self.okToContinue():
             return
-			
+            
         dir = os.path.dirname(self.filename) \
                 if self.filename is not None else "."
         img_formats = ["*.%s" % unicode(format).lower() \
                    for format in QImageReader.supportedImageFormats()]
-				   
+                   
         vid_formats = ["*.%s" % unicode(format).lower() \
                    for format in QMovie.supportedFormats()]
-				   
+                   
         vid_formats = [u'*.mp4']
         fname = unicode(QFileDialog.getOpenFileName(self,
                             "Image Annotation Tool - Choose Image", dir,
@@ -537,79 +547,79 @@ class MainWindow(QMainWindow):
             self.updateToolBar()
 
     def loadVideo(self, fname=None):
-		fsplit = fname.split("/")
-		nsplit = fsplit[len(fsplit)-1].split(".")
-		fsplit[len(fsplit)-1]=nsplit[0]
-		dirname="/".join(fsplit) + "/"
-		
-		msg = "Do you want to reverse the video?"
-		reply = QMessageBox.question(self, 'Message',
-						msg, QMessageBox.Yes, QMessageBox.No)
+        fsplit = fname.split("/")
+        nsplit = fsplit[len(fsplit)-1].split(".")
+        fsplit[len(fsplit)-1]=nsplit[0]
+        dirname="/".join(fsplit) + "/"
+        
+        msg = "Do you want to reverse the video?"
+        reply = QMessageBox.question(self, 'Message',
+                        msg, QMessageBox.Yes, QMessageBox.No)
 
-		reverse = True if reply == QMessageBox.Yes else False
-		
-		useDir = True
-		if os.path.exists(dirname):
-			msg = "Directory already exists. Do you want to use current existing directory? Warning could overwrite existing data!"
-			reply = QMessageBox.question(self, 'Warning! Directory Exists',
-							msg, QMessageBox.Yes, QMessageBox.No)
-			useDir = True if reply == QMessageBox.Yes else False
-			if useDir:
-				self.updateStatus("Directory used: %s" % dirname)
-		else:
-			os.makedirs(dirname)
-			self.updateStatus("Directory created: %s" % dirname)
-		
-		if useDir:
-			vidcap = cv2.VideoCapture(fname)
-			success,image = vidcap.read()
-			success = True
-			frames = []
-			while success:
-				success,image = vidcap.read()
-				if success:
-					image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
-					frames.insert(len(frames),image2)
-			
-			start = 0
-			end = len(frames)-1
-			step = 1
-			name = 0;
-			
-			if reverse:
-				self.updateStatus("Video Reversed")
-				start = end-1
-				end = -1
-				step = -1
-			else:		
-				self.updateStatus("Video Not Reversed")
-			
-			for i in range(start, end, step):
-				cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
-				name += 1
-		else:
-			self.updateStatus("Action stopped: Please rename file.")
-			return
-		
-		if dirname:
-			self.updateStatus("Open directory: %s" % dirname)
-			self.filepath = dirname
-			self.allImages = self.scanAllImages(dirname)
-			self.fileListWidget.clear()
-			for imgPath in self.allImages:
-				filename = os.path.basename(imgPath)
-				item = QListWidgetItem(filename)
-				self.fileListWidget.addItem(item)
+        reverse = True if reply == QMessageBox.Yes else False
+        
+        useDir = True
+        if os.path.exists(dirname):
+            msg = "Directory already exists. Do you want to use current existing directory? Warning could overwrite existing data!"
+            reply = QMessageBox.question(self, 'Warning! Directory Exists',
+                            msg, QMessageBox.Yes, QMessageBox.No)
+            useDir = True if reply == QMessageBox.Yes else False
+            if useDir:
+                self.updateStatus("Directory used: %s" % dirname)
+        else:
+            os.makedirs(dirname)
+            self.updateStatus("Directory created: %s" % dirname)
+        
+        if useDir:
+            vidcap = cv2.VideoCapture(fname)
+            success,image = vidcap.read()
+            success = True
+            frames = []
+            while success:
+                success,image = vidcap.read()
+                if success:
+                    image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
+                    frames.insert(len(frames),image2)
+            
+            start = 0
+            end = len(frames)-1
+            step = 1
+            name = 0;
+            
+            if reverse:
+                self.updateStatus("Video Reversed")
+                start = end-1
+                end = -1
+                step = -1
+            else:       
+                self.updateStatus("Video Not Reversed")
+            
+            for i in range(start, end, step):
+                cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
+                name += 1
+        else:
+            self.updateStatus("Action stopped: Please rename file.")
+            return
+        
+        if dirname:
+            self.updateStatus("Open directory: %s" % dirname)
+            self.filepath = dirname
+            self.allImages = self.scanAllImages(dirname)
+            self.fileListWidget.clear()
+            for imgPath in self.allImages:
+                filename = os.path.basename(imgPath)
+                item = QListWidgetItem(filename)
+                self.fileListWidget.addItem(item)
 
-			if len(self.allImages) > 0:
-				self.updateStatus("Open directory: %s" % dirname)
-				self.loadImage(self.allImages[0])
-				self.updateToolBar()
-				self.colorListWidget(self.allImages[0])
-			else:
-				QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
-		
-	
+            if len(self.allImages) > 0:
+                self.updateStatus("Open directory: %s" % dirname)
+                self.loadImage(self.allImages[0])
+                self.updateToolBar()
+                self.colorListWidget(self.allImages[0])
+            else:
+                QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
+        
+    
 
     def loadImage(self, fname=None):
         """Load the newest image"""
@@ -644,7 +654,7 @@ class MainWindow(QMainWindow):
                                   (self.cvimage.shape[1], self.cvimage.shape[0]),
                                   (self.backgroundColor.red(), self.backgroundColor.green(),
                                    self.backgroundColor.blue()), -1)
-
+                self.spMask = None
                 self.addRecentFile(self.filename)
                 self.sizeLabel.setText("Image size: %d x %d" %
                                        (self.cvimage.shape[1], self.cvimage.shape[0]))
@@ -709,15 +719,28 @@ class MainWindow(QMainWindow):
 
     def applyMask(self):
         """Apply mask to origin image and get the displayable image"""
-        grayImage = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2GRAY)
-        ret, mask = cv2.threshold(grayImage, 2, 255, cv2.THRESH_BINARY)
-        mask_inv = cv2.bitwise_not(mask)
-        labels1 = cv2.bitwise_and(self.outputMask, self.outputMask, mask = mask)
-        labels2 = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask)
-        origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask_inv)
-        labels = cv2.addWeighted(labels1, 0.5, labels2, 0.5, 0)
-        dst = cv2.add(labels, origin)
-        # If trying to apply floodfill
+        dst = self.cvimage
+        inverted = False
+        
+        gray_output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2GRAY)
+        ret, mask_output = cv2.threshold(gray_output, 2, 255, cv2.THRESH_BINARY)
+        masked_output = cv2.bitwise_and(self.outputMask, self.outputMask, mask = mask_output)
+        
+        if (masked_output!=0).any():
+            inverted = True
+            masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask_output)
+            temp = cv2.addWeighted(masked_output, 0.5, masked_image_output, 0.5, 0)
+            origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask = cv2.bitwise_not(mask_output))
+            dst = cv2.add(temp, origin)
+            
+        if self.spMask is not None: # and show sp
+            inverted = True
+            gray_sp = cv2.cvtColor(self.spMask, cv2.COLOR_RGB2GRAY)
+            ret, mask_sp = cv2.threshold(gray_sp, 2, 255, cv2.THRESH_BINARY)
+            mask_sp_inverted = cv2.bitwise_not(mask_sp)
+            masked_sp = cv2.bitwise_and(self.spMask, self.spMask, mask = mask_sp)
+            masked_out_sp = cv2.bitwise_and(dst, dst, mask = mask_sp_inverted)
+            dst = cv2.add(masked_sp, masked_out_sp)
 
         if self.choosingPointFF:
             factor = self.chooseFFPointSpinBoxValue * 1.0 / 100
@@ -760,14 +783,19 @@ class MainWindow(QMainWindow):
         self.updateStatus("Undo")
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
-			
-	def runSuperpixelAlg(self):
-		"""Run Superpixel Algorithm on the current Image"""
-		tom = 24
-		jess = 23
-		total = tom + jess
-		print("here")
-			
+            
+    def runSuperpixelAlg(self):
+        """Run Superpixel Algorithm on the current Image"""
+        self.spSegments = slic(self.cvimage, n_segments = 550, sigma = 5)
+        #self.spMask = mark_boundaries(self.cvimage, self.spSegments, color=(1,1,1))
+        self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments,
+                                      color=(1,0,0)))*255
+        #io.imsave("test_sp_mask.jpg", self.spMask)
+        #sys.exit()
+        self.showImage()
+        self.updateStatus("Superpixel algorithm run on %s" % os.path.basename(self.filename))
+        
+            
     def hideOriginalImage(self):
         """Hide original image and only show """
         if self.hideOriginalAction.isChecked():
