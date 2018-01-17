@@ -20,5 +20,7 @@
 		<file alias="superpixel.png">icons/sp.png</file>
 		<file alias="help.png">icons/help.png</file>
 		<file alias="helpabout.png">icons/helpabout.png</file>
+        <file alias="SPadd.png">icons/SPadd.png</file>
+        <file alias="SPsub.png">icons/SPsub.png</file>
     </qresource>
 </RCC>

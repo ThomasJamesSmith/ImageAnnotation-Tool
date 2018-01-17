@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # This is Image Annotation Tool for annotating plantations.
 # Created by Jingxiao Ma.
 # Languages: python 2 (2.7)
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
         self.isHiding = False
         self.isLaballing = False
         self.finishChoosingArea = False
+        self.spActive = False
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -196,6 +198,25 @@ class MainWindow(QMainWindow):
         
         self.superpixelAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel", "Run superpixel Algorithm")
         
+        self.hideSuperpixelAction = self.createAction("&Hide\nSuperpixels", self.hideSuperpixelOverlay, "Alt+H",
+                                                    "hide", "Hide superpixel overlay", True, "toggled(bool)")
+        # Create group of actions for superpixels
+        spGroup = QActionGroup(self)   
+        self.spMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+p",
+                                               "cursor", "No Action", True, "toggled(bool)")        
+        spGroup.addAction(self.spMouseAction)
+        self.spAddAction = self.createAction("&Add \nSuperpixel", self.labelSPAdd, "Alt+{",
+                                                     "SPadd", "Add superpixel to segment", True, "toggled(bool)")
+        spGroup.addAction(self.spAddAction)
+        self.spSubAction = self.createAction("&Subtract \nSuperpixel", self.labelSPAdd, "Alt+}", 
+                                                     "SPsub", "Subtract superpixel to segment", True, "toggled(bool)")
+        spGroup.addAction(self.spSubAction)
+        self.spMouseAction.setChecked(True)
+        self.spMouseAction.setEnabled(False)
+        self.spAddAction.setEnabled(False)
+        self.spSubAction.setEnabled(False)
+        self.hideSuperpixelAction.setEnabled(False)
+        
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
 
@@ -217,7 +238,8 @@ class MainWindow(QMainWindow):
         self.mouseAction.setChecked(True)
 
         self.resetableActions = ((self.hideOriginalAction, False),
-                                 (self.mouseAction, True))
+                                 (self.mouseAction, True),
+                                 (self.spMouseAction,True))
 
         # Set spin box
         self.zoomSpinBox = QSpinBox()
@@ -269,7 +291,9 @@ class MainWindow(QMainWindow):
         self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, None,
                                  self.paletteAction, self.confirmAction, self.deleteAction,
                                  self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
-                                 self.ellipseLabelAction, self.polygonLabelAction,None, self.superpixelAction)
+                                 self.ellipseLabelAction, self.polygonLabelAction,None, 
+                                 self.superpixelAction, self.hideSuperpixelAction, self.spMouseAction,
+                                 self.spAddAction, self.spSubAction, None)
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_2)
@@ -733,7 +757,7 @@ class MainWindow(QMainWindow):
             origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask = cv2.bitwise_not(mask_output))
             dst = cv2.add(temp, origin)
             
-        if self.spMask is not None: # and show sp
+        if self.spMask is not None and not self.hideSP: # and show sp
             inverted = True
             gray_sp = cv2.cvtColor(self.spMask, cv2.COLOR_RGB2GRAY)
             ret, mask_sp = cv2.threshold(gray_sp, 2, 255, cv2.THRESH_BINARY)
@@ -785,6 +809,7 @@ class MainWindow(QMainWindow):
             self.undoAction.setEnabled(False)
             
     def runSuperpixelAlg(self):
+        self.hideSP = False
         """Run Superpixel Algorithm on the current Image"""
         self.spSegments = slic(self.cvimage, n_segments = 550, sigma = 5)
         #self.spMask = mark_boundaries(self.cvimage, self.spSegments, color=(1,1,1))
@@ -793,6 +818,7 @@ class MainWindow(QMainWindow):
         #io.imsave("test_sp_mask.jpg", self.spMask)
         #sys.exit()
         self.showImage()
+        self.spActivate()
         self.updateStatus("Superpixel algorithm run on %s" % os.path.basename(self.filename))
         
             
@@ -803,7 +829,14 @@ class MainWindow(QMainWindow):
         else:
             self.isHiding = False
         self.showImage()
-
+        
+    def hideSuperpixelOverlay(self):
+        if self.hideSuperpixelAction.isChecked():
+            self.hideSP = True
+        else: 
+            self.hideSP = False
+            
+        self.showImage()
 
     def paintLabel(self, event):
         """First paint image, then paint label"""
@@ -842,6 +875,19 @@ class MainWindow(QMainWindow):
                     adjustedPoints.append(adjustedPoint)
                 qp.drawPolygon(QPolygonF(adjustedPoints[1:]))
 
+    def spActivate(self):
+        self.spActive = True
+        self.spMouseAction.setEnabled(True)
+        self.spAddAction.setEnabled(True)
+        self.spSubAction.setEnabled(True)
+        self.hideSuperpixelAction.setEnabled(True)
+        
+    def spDeactivate(self):
+        self.spActive = False
+        self.spMouseAction.setEnabled(False)
+        self.spAddAction.setEnabled(False)
+        self.spSubAction.setEnabled(False)
+        self.hideSuperpixelAction.setEnabled(False)
 
     def finishAreaChoosing(self):
         """Finish choosing the area, and then enable three editing choices"""
@@ -863,6 +909,9 @@ class MainWindow(QMainWindow):
     def labelPolygon(self):
         """Set mouse action when labelling polygon"""
         if self.sender().isChecked():
+            self.spMouseAction.setChecked(True)
+            self.setMouseAction()
+            
             self.isLaballing = False
             self.notFinishAreaChoosing()
             self.showImage()
@@ -875,6 +924,20 @@ class MainWindow(QMainWindow):
     def mouseReleasePoly(self, event):
         pass
 
+    def startSPAdd(self,event):
+        """Start labelling sp"""
+        self.imageLabel.setMouseTracking(True)
+        self.lastSpinboxValue = self.zoomSpinBox.value()
+        self.isLaballing = True
+        
+        
+    def stopSPAdd(self, event):
+        """Finish labelling sp"""
+        self.imageLabel.setMouseTracking(False)
+        self.spPosition = event.pos()
+        self.confirmEdit()
+        self.showImage()        
+        
     def startPoly(self, event):
         """Start labelling polygon"""
         self.imageLabel.setMouseTracking(True)
@@ -901,7 +964,6 @@ class MainWindow(QMainWindow):
         self.lines = []
         self.imageLabel.update()
         self.updateStatus("Choose an irregular polygon area")
-
 
     def setMouseAction(self):
         """Set mouse action when not labelling"""
@@ -933,10 +995,36 @@ class MainWindow(QMainWindow):
     def finishMove(self, event):
         pass
 
-
+    def labelSPAdd(self):
+        """Set mouse action when adding to superpixel segments"""
+        if self.sender().isChecked():
+            self.mouseAction.setChecked(True)
+            self.setMouseAction()
+            
+            self.isLaballing = False
+            self.notFinishAreaChoosing()
+            self.showImage()
+            self.imageLabel.mousePressEvent = self.startSPAdd
+            self.imageLabel.mouseReleaseEvent = self.stopSPAdd
+    
+    def labelSPAdd(self):
+        """Set mouse action when adding to superpixel segments"""
+        if self.sender().isChecked():
+            self.mouseAction.setChecked(True)
+            self.setMouseAction()
+            
+            self.isLaballing = False
+            self.notFinishAreaChoosing()
+            self.showImage()
+            self.imageLabel.mousePressEvent = self.startSPAdd
+            self.imageLabel.mouseReleaseEvent = self.stopSPAdd
+    
     def labelRectOrEllipse(self):
         """Set mouse action when labelling rectangle or ellipse"""
         if self.sender().isChecked():
+            self.spMouseAction.setChecked(True)
+            self.setMouseAction()
+            
             self.isLaballing = False
             self.notFinishAreaChoosing()
             self.showImage()
@@ -1073,6 +1161,24 @@ class MainWindow(QMainWindow):
             self.showImage()
             self.notFinishAreaChoosing()
             self.updateStatus("Label selected polygon area")
+        elif self.spAddAction.isChecked():
+            x = int(round(self.spPosition.x() / factor))
+            y = int(round(self.spPosition.y() / factor))
+            label = self.spSegments[y][x]
+            indices = np.argwhere(self.spSegments == label)
+            for i in range(0, len(indices)):
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
+                        self.currentColor.green(), self.currentColor.blue()]
+            self.updateStatus("Superpixel at x:%d y:%d added" % (x, y))
+        elif self.spSubAction.isChecked():
+            x = int(round(self.spPosition.x() / factor))
+            y = int(round(self.spPosition.y() / factor))
+            label = self.spSegments[y][x]
+            indices = np.argwhere(self.spSegments == label)
+            for i in range(0, len(indices)):
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(), 
+                                self.backgroundColor.green(), self.backgroundColor.blue()]
+            self.updateStatus("Superpixel at x:%d y:%d removed" % (x, y))
 
         if not self.dirty:
             self.setDirty()
