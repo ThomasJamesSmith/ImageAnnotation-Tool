@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
         self.isLaballing = False
         self.finishChoosingArea = False
         self.spActive = False
+        self.spNum = 550
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -196,9 +197,9 @@ class MainWindow(QMainWindow):
                                                  "flood-fill", "Apply flood-fill to selected area", True, "toggled(bool)")
         self.floodFillAction.setEnabled(False)
         
-        self.superpixelAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel", "Run superpixel Algorithm")
+        self.spAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel", "Run superpixel Algorithm")
         
-        self.hideSuperpixelAction = self.createAction("&Hide\nSuperpixels", self.hideSuperpixelOverlay, "Alt+H",
+        self.hidespAction = self.createAction("&Hide\nSuperpixels", self.hideSuperpixelOverlay, "Alt+H",
                                                     "hide", "Hide superpixel overlay", True, "toggled(bool)")
         # Create group of actions for superpixels
         spGroup = QActionGroup(self)   
@@ -215,7 +216,7 @@ class MainWindow(QMainWindow):
         self.spMouseAction.setEnabled(False)
         self.spAddAction.setEnabled(False)
         self.spSubAction.setEnabled(False)
-        self.hideSuperpixelAction.setEnabled(False)
+        self.hidespAction.setEnabled(False)
         
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
@@ -255,6 +256,16 @@ class MainWindow(QMainWindow):
                      SIGNAL("valueChanged(int)"), self.showImage)
 
         self.lastSpinboxValue = self.zoomSpinBox.value()
+        
+        self.spSpinBox = QSpinBox()
+        self.spSpinBox.setRange(100, 1000)
+        self.spSpinBox.setValue(550)
+        self.spSpinBox.setToolTip("Set number of Superpixels")
+        self.spSpinBox.setStatusTip(self.spSpinBox.toolTip())
+        self.spSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.spSpinBox,
+                     SIGNAL("valueChanged(int)"), self.updateSPNum)
+        self.spNum = self.spSpinBox.value()
 
         # Create color dialog
         self.colorDialog = ColorDialog(parent=self)
@@ -291,12 +302,14 @@ class MainWindow(QMainWindow):
         self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, None,
                                  self.paletteAction, self.confirmAction, self.deleteAction,
                                  self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
-                                 self.ellipseLabelAction, self.polygonLabelAction,None, 
-                                 self.superpixelAction, self.hideSuperpixelAction, self.spMouseAction,
+                                 self.ellipseLabelAction, self.polygonLabelAction,None)
+        self.toolBarActions_3 = (self.spAction, self.hidespAction, self.spMouseAction,
                                  self.spAddAction, self.spSubAction, None)
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_2)
+        self.toolBar.addWidget(self.spSpinBox)
+        self.addActions(self.toolBar, self.toolBarActions_3)
 
         self.colorLabelBar = QToolBar("Labels and colors")
         self.addToolBar(Qt.LeftToolBarArea, self.colorLabelBar)
@@ -373,7 +386,7 @@ class MainWindow(QMainWindow):
                 target.addSeparator()
             else:
                 target.addAction(action)
-
+    
 
     def updateFileMenu(self):
         """Update file menu to show recent open files"""
@@ -465,7 +478,11 @@ class MainWindow(QMainWindow):
         if self.outputMask is None:
             print "Noting to save"
             return
-
+        if self.spSegments is not None:
+            path = config.outputFile(self.filename)
+            dirSplit = path.split('.')
+            np.savetxt(dirSplit[0] + ".csv", self.spSegments, delimiter=",", fmt="%d")
+            
         output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2BGR)
         cv2.imwrite(config.outputFile(self.filename).decode('utf-8').encode('gbk'), output)
         self.updateStatus("Save to %s" % config.outputFile(self.filename))
@@ -696,6 +713,7 @@ class MainWindow(QMainWindow):
                 message = "Loaded %s" % os.path.basename(fname)
             self.updateStatus(message)
             self.setClean()
+            self.spDeactivate()
 
 
     def showImage(self, percent=None):
@@ -753,7 +771,7 @@ class MainWindow(QMainWindow):
         if (masked_output!=0).any():
             inverted = True
             masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask_output)
-            temp = cv2.addWeighted(masked_output, 0.5, masked_image_output, 0.5, 0)
+            temp = cv2.addWeighted(masked_output, 0.6, masked_image_output, 0.4, 0)
             origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask = cv2.bitwise_not(mask_output))
             dst = cv2.add(temp, origin)
             
@@ -807,11 +825,15 @@ class MainWindow(QMainWindow):
         self.updateStatus("Undo")
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
-            
+
+    def updateSPNum(self):
+        self.spNum = self.spSpinBox.value()
+        self.spAction.setEnabled(True)
+    
     def runSuperpixelAlg(self):
         self.hideSP = False
         """Run Superpixel Algorithm on the current Image"""
-        self.spSegments = slic(self.cvimage, n_segments = 550, sigma = 5)
+        self.spSegments = slic(self.cvimage, n_segments = self.spNum, sigma = 5)
         #self.spMask = mark_boundaries(self.cvimage, self.spSegments, color=(1,1,1))
         self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments,
                                       color=(1,0,0)))*255
@@ -831,7 +853,7 @@ class MainWindow(QMainWindow):
         self.showImage()
         
     def hideSuperpixelOverlay(self):
-        if self.hideSuperpixelAction.isChecked():
+        if self.hidespAction.isChecked():
             self.hideSP = True
         else: 
             self.hideSP = False
@@ -880,15 +902,19 @@ class MainWindow(QMainWindow):
         self.spMouseAction.setEnabled(True)
         self.spAddAction.setEnabled(True)
         self.spSubAction.setEnabled(True)
-        self.hideSuperpixelAction.setEnabled(True)
+        self.hidespAction.setEnabled(True)
+        self.spAction.setEnabled(False)
+        self.spAddAction.setChecked(True)
         
     def spDeactivate(self):
         self.spActive = False
         self.spMouseAction.setEnabled(False)
         self.spAddAction.setEnabled(False)
         self.spSubAction.setEnabled(False)
-        self.hideSuperpixelAction.setEnabled(False)
-
+        self.hidespAction.setEnabled(False)
+        self.spAction.setEnabled(True)
+        self.spMouseAction.setChecked(True)
+        
     def finishAreaChoosing(self):
         """Finish choosing the area, and then enable three editing choices"""
         self.finishChoosingArea = True
@@ -995,18 +1021,6 @@ class MainWindow(QMainWindow):
     def finishMove(self, event):
         pass
 
-    def labelSPAdd(self):
-        """Set mouse action when adding to superpixel segments"""
-        if self.sender().isChecked():
-            self.mouseAction.setChecked(True)
-            self.setMouseAction()
-            
-            self.isLaballing = False
-            self.notFinishAreaChoosing()
-            self.showImage()
-            self.imageLabel.mousePressEvent = self.startSPAdd
-            self.imageLabel.mouseReleaseEvent = self.stopSPAdd
-    
     def labelSPAdd(self):
         """Set mouse action when adding to superpixel segments"""
         if self.sender().isChecked():
@@ -1170,6 +1184,7 @@ class MainWindow(QMainWindow):
                 self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
                         self.currentColor.green(), self.currentColor.blue()]
             self.updateStatus("Superpixel at x:%d y:%d added" % (x, y))
+            #self.updateStatus("Superpixel at x:%d y:%d added, label:%d" % (x, y, label))
         elif self.spSubAction.isChecked():
             x = int(round(self.spPosition.x() / factor))
             y = int(round(self.spPosition.y() / factor))

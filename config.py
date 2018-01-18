@@ -11,7 +11,7 @@ except ImportError:
     from PyQt5.QtCore import *
     from PyQt5.QtWidgets import *
 
-DEFAULT_FILLING_COLOR = QColor(Qt.white)
+DEFAULT_FILLING_COLOR = QColor(Qt.red) #QColor(Qt.white)
 DEFAULT_BACKGROUND_COLOR = QColor(Qt.black)
 
 # Configuration of flood-fill
