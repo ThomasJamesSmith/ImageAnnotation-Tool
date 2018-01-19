@@ -704,6 +704,8 @@ class MainWindow(QMainWindow):
                     self.spSegments = np.int64(np.genfromtxt(dirSplit[0] + ".csv", delimiter=','))
                     self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments, color=(1,0,0)))*255
                     self.spActivate()
+                else:
+                    self.spDeactivate()
                     
                 self.addRecentFile(self.filename)
                 self.sizeLabel.setText("Image size: %d x %d" %
@@ -722,7 +724,6 @@ class MainWindow(QMainWindow):
                 message = "Loaded %s" % os.path.basename(fname)
             self.updateStatus(message)
             self.setClean()
-            self.spDeactivate()
 
 
     def showImage(self, percent=None):
