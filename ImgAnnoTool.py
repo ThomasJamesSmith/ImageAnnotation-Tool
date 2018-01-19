@@ -62,6 +62,8 @@ class MainWindow(QMainWindow):
         self.finishChoosingArea = False
         self.spActive = False
         self.spNum = 550
+        self.spMask = None
+        self.hideSP = False
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -695,7 +697,14 @@ class MainWindow(QMainWindow):
                                   (self.cvimage.shape[1], self.cvimage.shape[0]),
                                   (self.backgroundColor.red(), self.backgroundColor.green(),
                                    self.backgroundColor.blue()), -1)
-                self.spMask = None
+                
+                dir = config.outputFile(fname)
+                dirSplit = dir.split('.')
+                if os.path.exists(dirSplit[0] + ".csv"):
+                    self.spSegments = np.int64(np.genfromtxt(dirSplit[0] + ".csv", delimiter=','))
+                    self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments, color=(1,0,0)))*255
+                    self.spActivate()
+                    
                 self.addRecentFile(self.filename)
                 self.sizeLabel.setText("Image size: %d x %d" %
                                        (self.cvimage.shape[1], self.cvimage.shape[0]))
