@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         self.spNum = 550
         self.spMask = None
         self.hideSP = False
+        self.spPorgress = 0
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -517,15 +518,35 @@ class MainWindow(QMainWindow):
             if self.filename is not None else "."
         dirname = unicode(QFileDialog.getExistingDirectory(self,
                                 "Image Annotation Tool - Select Directory", dir))
+        # mass SP on load?
+        msg = "Do you want to apply superpixels to entire directory?"
+        reply = QMessageBox.question(self, 'Message',
+                        msg, QMessageBox.Yes, QMessageBox.No)
+        self.massSP = True if reply == QMessageBox.Yes else False
+             
         if dirname:
             self.updateStatus("Open directory: %s" % dirname)
             self.filepath = dirname
             self.allImages = self.scanAllImages(dirname)
             self.fileListWidget.clear()
+            total = len(self.allImages)
+            # counter = 1
+            # if self.massSP:
+                # self.spProgressBar = QProgressDialog("Running Superpixel Algorithm","Cancel", 0,0, self)
+                # self.spProgressBar.setValue(0)
+                # self.spProgressBar.canceled.connect(self.spProgressBarClose)
+                # self.spProgressBar.show()
+                
             for imgPath in self.allImages:
                 filename = os.path.basename(imgPath)
                 item = QListWidgetItem(filename)
                 self.fileListWidget.addItem(item)
+                if self.massSP:
+                    img = cv2.imread(imgPath.decode('utf-8').encode('gbk'))
+                    self.runMassSuperpixelAlg(img, imgPath)
+                    # self.spPorgress = counter / total * 100
+                    # self.spProgressBar.setValue(self.spPorgress)
+                    # self.spProgressBar.show()
 
             # Open first file
             if len(self.allImages) > 0:
@@ -536,7 +557,9 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
 
-
+    def spProgressBarClose(self):
+        self.massSP = False
+        
     def scanAllImages(self, imageDir):
         """Get a list of file name of images in a directory"""
         extensions = [".%s" % format \
@@ -706,6 +729,8 @@ class MainWindow(QMainWindow):
                     self.spActivate()
                 else:
                     self.spDeactivate()
+                    self.spSegments = None
+                    self.spMask = None
                     
                 self.addRecentFile(self.filename)
                 self.sizeLabel.setText("Image size: %d x %d" %
@@ -839,11 +864,24 @@ class MainWindow(QMainWindow):
     def updateSPNum(self):
         self.spNum = self.spSpinBox.value()
         self.spAction.setEnabled(True)
-    
+
+    def runMassSuperpixelAlg(self, img, dir):
+        #self.updateStatus("dir: %s" % dir)
+        if not os.path.exists(config.outputDir(dir)):
+                    os.makedirs(config.outputDir(dir))
+        output = np.zeros(img.shape, np.uint8)
+        segments = slic(img, n_segments = self.spNum, sigma=1, compactness=40)
+        path = config.outputFile(dir)
+        pathSplit = path.split('.')
+        np.savetxt(pathSplit[0] + ".csv", segments, delimiter=",", fmt="%d")        
+        output = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(config.outputFile(dir).decode('utf-8').encode('gbk'), output)
+        
+        
     def runSuperpixelAlg(self):
-        self.hideSP = False
         """Run Superpixel Algorithm on the current Image"""
-        self.spSegments = slic(self.cvimage, n_segments = self.spNum, sigma = 5)
+        self.hideSP = False
+        self.spSegments = slic(self.cvimage, n_segments = self.spNum, sigma=1, compactness=40)
         #self.spMask = mark_boundaries(self.cvimage, self.spSegments, color=(1,1,1))
         self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments,
                                       color=(1,0,0)))*255
