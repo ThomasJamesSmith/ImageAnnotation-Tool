@@ -27,6 +27,11 @@ from skimage.segmentation import slic
 from skimage.segmentation import mark_boundaries
 from skimage import io
 import sip
+from Queue import Queue
+#from threading import Thread
+import time
+from worker import *
+
 # RECOMMAND: Use PyQt4
 try:
     from PyQt4.QtCore import *
@@ -39,8 +44,8 @@ except ImportError:
 
 __version__ = '1.0'
 
-class MainWindow(QMainWindow):
 
+class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
 
@@ -64,7 +69,10 @@ class MainWindow(QMainWindow):
         self.spNum = 550
         self.spMask = None
         self.hideSP = False
-        self.spPorgress = 0
+        self.q = Queue(maxsize=0)
+        self.q_Video = Queue(maxsize=0)
+        self.num_threads = 5
+        self.firstDone = False
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -209,10 +217,10 @@ class MainWindow(QMainWindow):
         self.spMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+p",
                                                "cursor", "No Action", True, "toggled(bool)")        
         spGroup.addAction(self.spMouseAction)
-        self.spAddAction = self.createAction("&Add \nSuperpixel", self.labelSPAdd, "Alt+{",
+        self.spAddAction = self.createAction("&Add \nSuperpixel", self.labelSPAdd, "Ctrl+{",
                                                      "SPadd", "Add superpixel to segment", True, "toggled(bool)")
         spGroup.addAction(self.spAddAction)
-        self.spSubAction = self.createAction("&Subtract \nSuperpixel", self.labelSPAdd, "Alt+}", 
+        self.spSubAction = self.createAction("&Subtract \nSuperpixel", self.labelSPAdd, "Ctrl+}", 
                                                      "SPsub", "Subtract superpixel to segment", True, "toggled(bool)")
         spGroup.addAction(self.spSubAction)
         self.spMouseAction.setChecked(True)
@@ -343,6 +351,21 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self.loadInitFile)
         # Overload mouse wheel event to zoom image
         self.imageLabel.wheelEvent = self.mouseWheelEvent
+        
+        self.threadpool = QThreadPool()
+        for i in range(self.num_threads):
+            worker = Worker(self.runMassSuperpixelQueue, self.q)
+            worker.signals.progress.connect(self.loadFirstSPImage)
+
+            self.threadpool.start(worker)
+        self.videoName = ""
+        self.reverse = False
+
+        self.workerVideo = Worker(self.runVideoQueue, self.q_Video)
+        self.threadpool.start(self.workerVideo)
+        
+###############################################################################
+###############################################################################
 
 
     def setDirty(self):
@@ -518,48 +541,36 @@ class MainWindow(QMainWindow):
             if self.filename is not None else "."
         dirname = unicode(QFileDialog.getExistingDirectory(self,
                                 "Image Annotation Tool - Select Directory", dir))
-        # mass SP on load?
-        msg = "Do you want to apply superpixels to entire directory?"
-        reply = QMessageBox.question(self, 'Message',
-                        msg, QMessageBox.Yes, QMessageBox.No)
-        self.massSP = True if reply == QMessageBox.Yes else False
              
         if dirname:
+            # mass SP on load?
+            msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
+            reply = QMessageBox.question(self, 'Message',
+                        msg, QMessageBox.Yes, QMessageBox.No)
+            self.massSP = True if reply == QMessageBox.Yes else False
+        
             self.updateStatus("Open directory: %s" % dirname)
             self.filepath = dirname
             self.allImages = self.scanAllImages(dirname)
             self.fileListWidget.clear()
             total = len(self.allImages)
-            # counter = 1
-            # if self.massSP:
-                # self.spProgressBar = QProgressDialog("Running Superpixel Algorithm","Cancel", 0,0, self)
-                # self.spProgressBar.setValue(0)
-                # self.spProgressBar.canceled.connect(self.spProgressBarClose)
-                # self.spProgressBar.show()
                 
             for imgPath in self.allImages:
                 filename = os.path.basename(imgPath)
                 item = QListWidgetItem(filename)
                 self.fileListWidget.addItem(item)
-                if self.massSP:
-                    img = cv2.imread(imgPath.decode('utf-8').encode('gbk'))
-                    self.runMassSuperpixelAlg(img, imgPath)
-                    # self.spPorgress = counter / total * 100
-                    # self.spProgressBar.setValue(self.spPorgress)
-                    # self.spProgressBar.show()
+                self.q.put(imgPath)
 
             # Open first file
             if len(self.allImages) > 0:
-                self.updateStatus("Open directory: %s" % dirname)
-                self.loadImage(self.allImages[0])
-                self.updateToolBar()
-                self.colorListWidget(self.allImages[0])
+                if not self.massSP:
+                    self.loadImage(self.allImages[0])
+                    self.updateToolBar()
+                    self.colorListWidget(self.allImages[0])
             else:
                 QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
-
-    def spProgressBarClose(self):
-        self.massSP = False
-        
+            self.massSP = False
+            
     def scanAllImages(self, imageDir):
         """Get a list of file name of images in a directory"""
         extensions = [".%s" % format \
@@ -637,55 +648,82 @@ class MainWindow(QMainWindow):
             self.updateStatus("Directory created: %s" % dirname)
         
         if useDir:
-            vidcap = cv2.VideoCapture(fname)
-            success,image = vidcap.read()
-            success = True
-            frames = []
-            while success:
-                success,image = vidcap.read()
-                if success:
-                    image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
-                    frames.insert(len(frames),image2)
-            
-            start = 0
-            end = len(frames)-1
-            step = 1
-            name = 0;
-            
-            if reverse:
-                self.updateStatus("Video Reversed")
-                start = end-1
-                end = -1
-                step = -1
-            else:       
-                self.updateStatus("Video Not Reversed")
-            
-            for i in range(start, end, step):
-                cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
-                name += 1
+            self.q_Video.put([fname, reverse, dirname])
         else:
             self.updateStatus("Action stopped: Please rename file.")
             return
+        
+        # mass SP on load?
+        msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
+        reply = QMessageBox.question(self, 'Message',
+                    msg, QMessageBox.Yes, QMessageBox.No)
+        self.massSP = True if reply == QMessageBox.Yes else False
         
         if dirname:
             self.updateStatus("Open directory: %s" % dirname)
             self.filepath = dirname
             self.allImages = self.scanAllImages(dirname)
             self.fileListWidget.clear()
+            sleep = 5
+            count = 0
             for imgPath in self.allImages:
                 filename = os.path.basename(imgPath)
                 item = QListWidgetItem(filename)
                 self.fileListWidget.addItem(item)
+                if self.massSP:
+                    self.q.put([imgPath, sleep])
+                    
+                    if count > self.threadpool.maxThreadCount():
+                        sleep = 0
+                    else:
+                        count += 1
 
             if len(self.allImages) > 0:
-                self.updateStatus("Open directory: %s" % dirname)
-                self.loadImage(self.allImages[0])
-                self.updateToolBar()
-                self.colorListWidget(self.allImages[0])
+                if not self.massSP:
+                    self.updateStatus("Open directory: %s" % dirname)
+                    self.loadImage(self.allImages[0])
+                    self.updateToolBar()
+                    self.colorListWidget(self.allImages[0])
             else:
                 QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
-        
     
+    def runVideoQueue(self, q, progress_callback):
+        while True:
+            self.openVideo(q.get())
+            q.task_done()   
+    
+    def openVideo(self, arg):
+        fname = arg[0]
+        reverse = arg[1]
+        dirname = arg[2]
+        print("openVideo: " + fname)
+        vidcap = cv2.VideoCapture(fname)
+        success,image = vidcap.read()
+        success = True
+        frames = []
+        while success:
+            success,image = vidcap.read()
+            if success:
+                image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
+                frames.insert(len(frames),image2)
+        
+        start = 0
+        end = len(frames)-1
+        step = 1
+        name = 0;
+        
+        if reverse:
+            #self.updateStatus("Video Reversed")
+            start = end-1
+            end = -1
+            step = -1
+        else: 
+            i = 1        
+            #self.updateStatus("Video Not Reversed")
+        
+        for i in range(start, end, step):
+            cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
+            name += 1
 
     def loadImage(self, fname=None):
         """Load the newest image"""
@@ -864,9 +902,27 @@ class MainWindow(QMainWindow):
     def updateSPNum(self):
         self.spNum = self.spSpinBox.value()
         self.spAction.setEnabled(True)
+    
+    def runMassSuperpixelQueue(self, q, progress_callback):
+        while True:
+            self.runMassSuperpixelAlg(q.get())
+            q.task_done()
+            progress_callback.emit(1)
 
-    def runMassSuperpixelAlg(self, img, dir):
-        #self.updateStatus("dir: %s" % dir)
+    def loadFirstSPImage(self, null): 
+        if not self.firstDone:
+            self.firstDone = True
+            time.sleep(2)
+            if not len(self.allImages) == 0:
+                self.loadImage(self.allImages[0])
+            else:
+                self.loadImage(self.fileName)
+            self.spActivate()
+    
+    def runMassSuperpixelAlg(self, arg):
+        dir = arg[0]
+        time.sleep(arg[1])
+        img = cv2.imread(dir.decode('utf-8').encode('gbk'))
         if not os.path.exists(config.outputDir(dir)):
                     os.makedirs(config.outputDir(dir))
         output = np.zeros(img.shape, np.uint8)
@@ -877,20 +933,8 @@ class MainWindow(QMainWindow):
         output = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
         cv2.imwrite(config.outputFile(dir).decode('utf-8').encode('gbk'), output)
         
-        
     def runSuperpixelAlg(self):
-        """Run Superpixel Algorithm on the current Image"""
-        self.hideSP = False
-        self.spSegments = slic(self.cvimage, n_segments = self.spNum, sigma=1, compactness=40)
-        #self.spMask = mark_boundaries(self.cvimage, self.spSegments, color=(1,1,1))
-        self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments,
-                                      color=(1,0,0)))*255
-        #io.imsave("test_sp_mask.jpg", self.spMask)
-        #sys.exit()
-        self.showImage()
-        self.spActivate()
-        self.updateStatus("Superpixel algorithm run on %s" % os.path.basename(self.filename))
-        
+        self.q.put(self.fileName)
             
     def hideOriginalImage(self):
         """Hide original image and only show """
@@ -1441,6 +1485,7 @@ class MainWindow(QMainWindow):
         settings = QSettings()
         fname = unicode(settings.value("LastFile").toString())
         if fname and QFile.exists(fname):
+            self.fileName = fname
             self.cvimage = fname
             self.loadImage(fname)
             self.updateToolBar()
