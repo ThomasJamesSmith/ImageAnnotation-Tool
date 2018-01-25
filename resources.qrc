@@ -17,7 +17,10 @@
 		<file alias="flood-fill.png">icons/flood-fill.png</file>
 		<file alias="writing.png">icons/writing.png</file>
 		<file alias="undo.png">icons/undo.png</file>
+		<file alias="superpixel.png">icons/sp.png</file>
 		<file alias="help.png">icons/help.png</file>
 		<file alias="helpabout.png">icons/helpabout.png</file>
+        <file alias="SPadd.png">icons/SPadd.png</file>
+        <file alias="SPsub.png">icons/SPsub.png</file>
     </qresource>
 </RCC>

@@ -1,10 +1,18 @@
 # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # This is Image Annotation Tool for annotating plantations.
 # Created by Jingxiao Ma.
 # Languages: python 2 (2.7)
 # Sys requirement: Linux / Windows 7 / OS X 10.8 or later versions
 # Package requirement: PyQt 4 / OpenCv 2 / numpy
 
+#
+#   use the segments from sp as overlay
+#   np.where(a == 1)
+#   can select a segment, when selected search sp_img for all occurences of label
+#   selected pixels are then added to the mask
+#   have option to remove segment from mask
+#
 
 import os
 import platform
@@ -15,7 +23,15 @@ import cv2
 import config
 from colorDialog import *
 from FloodFillConfig import *
+from skimage.segmentation import slic
+from skimage.segmentation import mark_boundaries
+from skimage import io
 import sip
+from Queue import Queue
+#from threading import Thread
+import time
+from worker import *
+
 # RECOMMAND: Use PyQt4
 try:
     from PyQt4.QtCore import *
@@ -28,8 +44,8 @@ except ImportError:
 
 __version__ = '1.0'
 
-class MainWindow(QMainWindow):
 
+class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
 
@@ -46,9 +62,22 @@ class MainWindow(QMainWindow):
         self.filepath = None    # Directory of the image file
         self.dirty = False      # Whether modified
         self.isLoading = True
-        self.isHiding = False
+        self.hideImg = False
+        self.hideSP = False
+        self.hideMask = False
         self.isLaballing = False
         self.finishChoosingArea = False
+        self.spActive = False
+        self.spNum = 550
+        self.spMask = None
+        self.q = Queue(maxsize=0)
+        self.q_Video = Queue(maxsize=0)
+        self.num_threads = 5
+        self.firstDone = False
+        self.spMassActive = False
+        self.spMassTotal = 0
+        self.spMassComplete = 0
+        self.mutex = QMutex()
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -167,9 +196,12 @@ class MainWindow(QMainWindow):
         showLogViewerAction = self.createAction("&Show Log...", self.showLog, "Alt+K",
                                                 None, "Show log dock")
 
-        self.hideOriginalAction = self.createAction("&Hide\nOriginal", self.hideOriginalImage, "Ctrl+H",
+        self.hideOriginalAction = self.createAction("&Hide\nImage", self.hideButtonClick, "Ctrl+H",
+                                                    "hide", "Hide original image", True, "toggled(bool)")
+        self.hideMaskAction = self.createAction("&Hide\nMask", self.hideButtonClick, "Ctrl+H",
                                                     "hide", "Hide original image", True, "toggled(bool)")
         self.hideOriginalAction.setChecked(False)
+        self.hideMaskAction.setChecked(False)
 
         self.paletteAction = self.createAction("&Palette...", self.chooseColor, "Ctrl+L",
                                           None, "Choose the color to label items")
@@ -183,7 +215,28 @@ class MainWindow(QMainWindow):
         self.floodFillAction = self.createAction("&Flood\nFill", self.setFloodFillAction, "Ctrl+F",
                                                  "flood-fill", "Apply flood-fill to selected area", True, "toggled(bool)")
         self.floodFillAction.setEnabled(False)
-
+        
+        self.spAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel", "Run superpixel Algorithm")
+        
+        self.hidespAction = self.createAction("&Hide\nSuperpixels", self.hideButtonClick, "Alt+H",
+                                                    "hide", "Hide superpixel overlay", True, "toggled(bool)")
+        # Create group of actions for superpixels
+        spGroup = QActionGroup(self)   
+        self.spMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+p",
+                                               "cursor", "No Action", True, "toggled(bool)")        
+        spGroup.addAction(self.spMouseAction)
+        self.spAddAction = self.createAction("&Add \nSuperpixel", self.labelSPAdd, "Ctrl+{",
+                                                     "SPadd", "Add superpixel to segment", True, "toggled(bool)")
+        spGroup.addAction(self.spAddAction)
+        self.spSubAction = self.createAction("&Subtract \nSuperpixel", self.labelSPAdd, "Ctrl+}", 
+                                                     "SPsub", "Subtract superpixel to segment", True, "toggled(bool)")
+        spGroup.addAction(self.spSubAction)
+        self.spMouseAction.setChecked(True)
+        self.spMouseAction.setEnabled(False)
+        self.spAddAction.setEnabled(False)
+        self.spSubAction.setEnabled(False)
+        self.hidespAction.setEnabled(False)
+        
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
 
@@ -205,7 +258,9 @@ class MainWindow(QMainWindow):
         self.mouseAction.setChecked(True)
 
         self.resetableActions = ((self.hideOriginalAction, False),
-                                 (self.mouseAction, True))
+                                 (self.hideMaskAction, False),
+                                 (self.mouseAction, True),
+                                 (self.spMouseAction,True))
 
         # Set spin box
         self.zoomSpinBox = QSpinBox()
@@ -221,6 +276,16 @@ class MainWindow(QMainWindow):
                      SIGNAL("valueChanged(int)"), self.showImage)
 
         self.lastSpinboxValue = self.zoomSpinBox.value()
+        
+        self.spSpinBox = QSpinBox()
+        self.spSpinBox.setRange(100, 1000)
+        self.spSpinBox.setValue(550)
+        self.spSpinBox.setToolTip("Set number of Superpixels")
+        self.spSpinBox.setStatusTip(self.spSpinBox.toolTip())
+        self.spSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.spSpinBox,
+                     SIGNAL("valueChanged(int)"), self.updateSPNum)
+        self.spNum = self.spSpinBox.value()
 
         # Create color dialog
         self.colorDialog = ColorDialog(parent=self)
@@ -239,7 +304,7 @@ class MainWindow(QMainWindow):
                                    self.ellipseLabelAction, self.polygonLabelAction))
 
         viewMenu = self.menuBar().addMenu("&View")
-        self.addActions(viewMenu, (zoomInAction, zoomOutAction, self.hideOriginalAction,
+        self.addActions(viewMenu, (zoomInAction, zoomOutAction, self.hideOriginalAction,self.hideMaskAction,
                                    None, hideLogViewerAction, showLogViewerAction))
 
         helpMenu = self.menuBar().addMenu("&Help")
@@ -254,13 +319,17 @@ class MainWindow(QMainWindow):
         self.toolBar.setObjectName("ToolBar")
         self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, self.undoAction,
                                  quitAction, None, zoomInAction)
-        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, None,
+        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, self.hideMaskAction, None,
                                  self.paletteAction, self.confirmAction, self.deleteAction,
                                  self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
-                                 self.ellipseLabelAction, self.polygonLabelAction)
+                                 self.ellipseLabelAction, self.polygonLabelAction,None)
+        self.toolBarActions_3 = (self.spAction, self.hidespAction, self.spMouseAction,
+                                 self.spAddAction, self.spSubAction, None)
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_2)
+        self.toolBar.addWidget(self.spSpinBox)
+        self.addActions(self.toolBar, self.toolBarActions_3)
 
         self.colorLabelBar = QToolBar("Labels and colors")
         self.addToolBar(Qt.LeftToolBarArea, self.colorLabelBar)
@@ -291,6 +360,21 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self.loadInitFile)
         # Overload mouse wheel event to zoom image
         self.imageLabel.wheelEvent = self.mouseWheelEvent
+        
+        self.threadpool = QThreadPool()
+        for i in range(self.num_threads):
+            worker = Worker(self.runMassSuperpixelQueue, self.q)
+            worker.signals.progress.connect(self.loadFirstSPImage)
+
+            self.threadpool.start(worker)
+        self.videoName = ""
+        self.reverse = False
+
+        self.workerVideo = Worker(self.runVideoQueue, self.q_Video)
+        self.threadpool.start(self.workerVideo)
+        
+###############################################################################
+###############################################################################
 
 
     def setDirty(self):
@@ -337,7 +421,7 @@ class MainWindow(QMainWindow):
                 target.addSeparator()
             else:
                 target.addAction(action)
-
+    
 
     def updateFileMenu(self):
         """Update file menu to show recent open files"""
@@ -400,6 +484,7 @@ class MainWindow(QMainWindow):
         """Update message on status bar and window title"""
         self.statusBar().showMessage(message, 5000)
         self.listWidget.addItem(message)
+        self.listWidget.scrollToBottom()
         if self.filename is not None:
             self.setWindowTitle("Image Annotation Tool - %s[*]" % \
                                 os.path.basename(self.filename))
@@ -429,7 +514,11 @@ class MainWindow(QMainWindow):
         if self.outputMask is None:
             print "Noting to save"
             return
-
+        if self.spSegments is not None:
+            path = config.outputFile(self.filename)
+            dirSplit = path.split('.')
+            np.savetxt(dirSplit[0] + ".csv", self.spSegments, delimiter=",", fmt="%d")
+            
         output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2BGR)
         cv2.imwrite(config.outputFile(self.filename).decode('utf-8').encode('gbk'), output)
         self.updateStatus("Save to %s" % config.outputFile(self.filename))
@@ -462,26 +551,45 @@ class MainWindow(QMainWindow):
             if self.filename is not None else "."
         dirname = unicode(QFileDialog.getExistingDirectory(self,
                                 "Image Annotation Tool - Select Directory", dir))
+             
         if dirname:
+            # mass SP on load?
+            msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
+            reply = QMessageBox.question(self, 'Message',
+                        msg, QMessageBox.Yes, QMessageBox.No)
+            self.massSP = True if reply == QMessageBox.Yes else False
+        
             self.updateStatus("Open directory: %s" % dirname)
             self.filepath = dirname
             self.allImages = self.scanAllImages(dirname)
             self.fileListWidget.clear()
+            if self.massSP and not self.spMassActive:
+                self.spMassTotal = len(self.allImages)
+                self.spMassComplete = 0
+                self.spMassActive = True
+                self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
+            else:
+                self.mass = False
+                QMessageBox.warning(self, 'Warning', "Mass superpixel execution already running")
+                
             for imgPath in self.allImages:
                 filename = os.path.basename(imgPath)
                 item = QListWidgetItem(filename)
                 self.fileListWidget.addItem(item)
+                if self.massSP:
+                    self.q.put([imgPath,0])
 
             # Open first file
             if len(self.allImages) > 0:
-                self.updateStatus("Open directory: %s" % dirname)
-                self.loadImage(self.allImages[0])
-                self.updateToolBar()
-                self.colorListWidget(self.allImages[0])
+                if not self.massSP:
+                    self.loadImage(self.allImages[0])
+                    self.updateToolBar()
+                    self.colorListWidget(self.allImages[0])                  
             else:
                 QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
-
-
+                self.spMassActive = False
+            self.massSP = False
+            
     def scanAllImages(self, imageDir):
         """Get a list of file name of images in a directory"""
         extensions = [".%s" % format \
@@ -510,21 +618,19 @@ class MainWindow(QMainWindow):
                 self.loadImage(filename)
                 self.colorListWidget(filename)
 
-
-
     def fileOpen(self):
         """Open a file with file dialog"""
         if not self.okToContinue():
             return
-			
+            
         dir = os.path.dirname(self.filename) \
                 if self.filename is not None else "."
         img_formats = ["*.%s" % unicode(format).lower() \
                    for format in QImageReader.supportedImageFormats()]
-				   
+                   
         vid_formats = ["*.%s" % unicode(format).lower() \
                    for format in QMovie.supportedFormats()]
-				   
+                   
         vid_formats = [u'*.mp4']
         fname = unicode(QFileDialog.getOpenFileName(self,
                             "Image Annotation Tool - Choose Image", dir,
@@ -537,65 +643,115 @@ class MainWindow(QMainWindow):
             self.updateToolBar()
 
     def loadVideo(self, fname=None):
-		fsplit = fname.split("/")
-		nsplit = fsplit[len(fsplit)-1].split(".")
-		fsplit[len(fsplit)-1]=nsplit[0]
-		dirname="/".join(fsplit) + "/"
-		
-		msg = "Do you want to reverse the video?"
-		reply = QMessageBox.question(self, 'Message',
-						msg, QMessageBox.Yes, QMessageBox.No)
+        fsplit = fname.split("/")
+        nsplit = fsplit[len(fsplit)-1].split(".")
+        fsplit[len(fsplit)-1]=nsplit[0]
+        dirname="/".join(fsplit) + "/"
+        
+        msg = "Do you want to reverse the video?"
+        reply = QMessageBox.question(self, 'Message',
+                        msg, QMessageBox.Yes, QMessageBox.No)
 
-		reverse = True if reply == QMessageBox.Yes else False
+        reverse = True if reply == QMessageBox.Yes else False
+        
+        useDir = True
+        if os.path.exists(dirname):
+            msg = "Directory already exists. Do you want to use current existing directory? Warning could overwrite existing data!"
+            reply = QMessageBox.question(self, 'Warning! Directory Exists',
+                            msg, QMessageBox.Yes, QMessageBox.No)
+            useDir = True if reply == QMessageBox.Yes else False
+            if useDir:
+                self.updateStatus("Directory used: %s" % dirname)
+        else:
+            os.makedirs(dirname)
+            self.updateStatus("Directory created: %s" % dirname)
+        
+        if useDir:
+            self.q_Video.put([fname, reverse, dirname])
+        else:
+            self.updateStatus("Action stopped: Please rename file.")
+            return
+        
+        if dirname:
+            # mass SP on load?
+            msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
+            reply = QMessageBox.question(self, 'Message',
+                    msg, QMessageBox.Yes, QMessageBox.No)
+            self.massSP = True if reply == QMessageBox.Yes else False
+            
+            self.updateStatus("Open directory: %s" % dirname)
+            self.filepath = dirname
+            self.allImages = self.scanAllImages(dirname)
+            self.fileListWidget.clear()
+            if self.massSP and not self.spMassActive:
+                self.spMassTotal = len(self.allImages)
+                self.spMassComplete = 0
+                self.spMassActive = True
+                self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
+            else:
+                self.mass = False
+                QMessageBox.warning(self, 'Warning', "Mass superpixel execution already running")
+                
+            sleep = 5
+            count = 0
+            for imgPath in self.allImages:
+                filename = os.path.basename(imgPath)
+                item = QListWidgetItem(filename)
+                self.fileListWidget.addItem(item)
+                if self.massSP:
+                    self.q.put([imgPath, sleep])
+                    
+                    if count > self.threadpool.maxThreadCount():
+                        sleep = 0
+                    else:
+                        count += 1
 
-		
-		if not os.path.exists(dirname):
-			os.makedirs(dirname)
-			
-			vidcap = cv2.VideoCapture(fname)
-			success,image = vidcap.read()
-			success = True
-			frames = []
-			while success:
-				success,image = vidcap.read()
-				frames.insert(len(frames),image)
-			
-			start = 0
-			end = len(frames)-1
-			step = 1
-			name = 0;
-			
-			if reverse:
-				self.updateStatus("Video Reversed")
-				start = end-1
-				end = -1
-				step = -1
-			else:		
-				self.updateStatus("Video Not Reversed")
-			
-			for i in range(start, end, step):
-				cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
-				name += 1
-		
-		if dirname:
-			self.updateStatus("Open directory: %s" % dirname)
-			self.filepath = dirname
-			self.allImages = self.scanAllImages(dirname)
-			self.fileListWidget.clear()
-			for imgPath in self.allImages:
-				filename = os.path.basename(imgPath)
-				item = QListWidgetItem(filename)
-				self.fileListWidget.addItem(item)
-
-			if len(self.allImages) > 0:
-				self.updateStatus("Open directory: %s" % dirname)
-				self.loadImage(self.allImages[0])
-				self.updateToolBar()
-				self.colorListWidget(self.allImages[0])
-			else:
-				QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
-		
-	
+            if len(self.allImages) > 0:
+                if not self.massSP:
+                    self.updateStatus("Open directory: %s" % dirname)
+                    self.loadImage(self.allImages[0])
+                    self.updateToolBar()
+                    self.colorListWidget(self.allImages[0])
+            else:
+                QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
+            self.massSP = False
+    
+    def runVideoQueue(self, q, progress_callback):
+        while True:
+            self.openVideo(q.get())
+            q.task_done()   
+    
+    def openVideo(self, arg):
+        fname = arg[0]
+        reverse = arg[1]
+        dirname = arg[2]
+        vidcap = cv2.VideoCapture(fname)
+        success,image = vidcap.read()
+        success = True
+        frames = []
+        while success:
+            success,image = vidcap.read()
+            if success:
+                image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
+                frames.insert(len(frames),image2)
+        
+        start = 0
+        end = len(frames)-1
+        step = 1
+        name = 0;
+        
+        if reverse:
+            #self.updateStatus("Video Reversed")
+            start = end-1
+            end = -1
+            step = -1
+        else: 
+            i = 1        
+            #self.updateStatus("Video Not Reversed")
+        
+        for i in range(start, end, step):
+            cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
+            name += 1
 
     def loadImage(self, fname=None):
         """Load the newest image"""
@@ -630,7 +786,18 @@ class MainWindow(QMainWindow):
                                   (self.cvimage.shape[1], self.cvimage.shape[0]),
                                   (self.backgroundColor.red(), self.backgroundColor.green(),
                                    self.backgroundColor.blue()), -1)
-
+                
+                dir = config.outputFile(fname)
+                dirSplit = dir.split('.')
+                if os.path.exists(dirSplit[0] + ".csv"):
+                    self.spSegments = np.int64(np.genfromtxt(dirSplit[0] + ".csv", delimiter=','))
+                    self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments, color=(1,0,0)))*255
+                    self.spActivate()
+                else:
+                    self.spDeactivate()
+                    self.spSegments = None
+                    self.spMask = None
+                    
                 self.addRecentFile(self.filename)
                 self.sizeLabel.setText("Image size: %d x %d" %
                                        (self.cvimage.shape[1], self.cvimage.shape[0]))
@@ -695,15 +862,28 @@ class MainWindow(QMainWindow):
 
     def applyMask(self):
         """Apply mask to origin image and get the displayable image"""
-        grayImage = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2GRAY)
-        ret, mask = cv2.threshold(grayImage, 2, 255, cv2.THRESH_BINARY)
-        mask_inv = cv2.bitwise_not(mask)
-        labels1 = cv2.bitwise_and(self.outputMask, self.outputMask, mask = mask)
-        labels2 = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask)
-        origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask_inv)
-        labels = cv2.addWeighted(labels1, 0.5, labels2, 0.5, 0)
-        dst = cv2.add(labels, origin)
-        # If trying to apply floodfill
+        dst = self.cvimage
+        inverted = False
+        
+        gray_output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2GRAY)
+        ret, mask_output = cv2.threshold(gray_output, 2, 255, cv2.THRESH_BINARY)
+        masked_output = cv2.bitwise_and(self.outputMask, self.outputMask, mask = mask_output)
+        
+        if (masked_output!=0).any() and not self.hideMask:
+            inverted = True
+            masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask_output)
+            temp = cv2.addWeighted(masked_output, 0.6, masked_image_output, 0.4, 0)
+            origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask = cv2.bitwise_not(mask_output))
+            dst = cv2.add(temp, origin)
+            
+        if self.spMask is not None and not self.hideSP: # and show sp
+            inverted = True
+            gray_sp = cv2.cvtColor(self.spMask, cv2.COLOR_RGB2GRAY)
+            ret, mask_sp = cv2.threshold(gray_sp, 2, 255, cv2.THRESH_BINARY)
+            mask_sp_inverted = cv2.bitwise_not(mask_sp)
+            masked_sp = cv2.bitwise_and(self.spMask, self.spMask, mask = mask_sp)
+            masked_out_sp = cv2.bitwise_and(dst, dst, mask = mask_sp_inverted)
+            dst = cv2.add(masked_sp, masked_out_sp)
 
         if self.choosingPointFF:
             factor = self.chooseFFPointSpinBoxValue * 1.0 / 100
@@ -728,7 +908,7 @@ class MainWindow(QMainWindow):
             singlecolor = np.zeros((height, width, 3), np.uint8) # Create a single color image to specify the FF area
             singlecolor[:, :] = [self.currentColor.red(), self.currentColor.green(), self.currentColor.blue()]
             area_FloodFill = cv2.bitwise_and(singlecolor, singlecolor, mask=mask)
-            if self.hideOriginalAction.isChecked():
+            if self.hideImg:
                 output_origin = cv2.bitwise_and(self.outputMask, self.outputMask, mask=mask_inv)
                 dst = cv2.add(output_origin, area_FloodFill)
             else:
@@ -747,13 +927,68 @@ class MainWindow(QMainWindow):
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
 
+    def updateSPNum(self):
+        self.spNum = self.spSpinBox.value()
+        self.spAction.setEnabled(True)
+    
+    def runMassSuperpixelQueue(self, q, progress_callback):
+        while True:
+            self.runMassSuperpixelAlg(q.get())
+            q.task_done()
+            progress_callback.emit(1)
 
-    def hideOriginalImage(self):
-        """Hide original image and only show """
+    def loadFirstSPImage(self, null):
+        self.mutex.lock()
+        self.spMassComplete += 1
+        self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
+        self.mutex.unlock()
+        
+        if self.spMassComplete == self.spMassTotal:
+            self.spMassActive = False
+        
+        if not self.firstDone:
+            self.firstDone = True
+            time.sleep(2)
+            if not len(self.allImages) == 0:
+                self.loadImage(self.allImages[0])
+            else:
+                self.loadImage(self.fileName)
+            self.spActivate()
+    
+    def runMassSuperpixelAlg(self, arg):
+        dir = arg[0]
+        time.sleep(arg[1])
+        img = cv2.imread(dir.decode('utf-8').encode('gbk'))
+        if not os.path.exists(config.outputDir(dir)):
+                    os.makedirs(config.outputDir(dir))
+        output = np.zeros(img.shape, np.uint8)
+        segments = slic(img, n_segments = self.spNum, sigma=1, compactness=40)
+        path = config.outputFile(dir)
+        pathSplit = path.split('.')
+        np.savetxt(pathSplit[0] + ".csv", segments, delimiter=",", fmt="%d")        
+        output = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(config.outputFile(dir).decode('utf-8').encode('gbk'), output)
+        
+    def runSuperpixelAlg(self):
+        self.q.put(self.fileName)
+            
+    def hideButtonClick(self):
+        """Handle Hide button clicks"""
         if self.hideOriginalAction.isChecked():
-            self.isHiding = True
+            self.hideImg = True
         else:
-            self.isHiding = False
+            self.hideImg = False
+            
+        if self.hidespAction.isChecked():
+            self.hideSP = True
+        else: 
+            self.hideSP = False
+            
+        if self.hideMaskAction.isChecked():
+            self.hideMask = True
+        else: 
+            self.hideMask = False
+            
         self.showImage()
 
 
@@ -794,7 +1029,24 @@ class MainWindow(QMainWindow):
                     adjustedPoints.append(adjustedPoint)
                 qp.drawPolygon(QPolygonF(adjustedPoints[1:]))
 
-
+    def spActivate(self):
+        self.spActive = True
+        self.spMouseAction.setEnabled(True)
+        self.spAddAction.setEnabled(True)
+        self.spSubAction.setEnabled(True)
+        self.hidespAction.setEnabled(True)
+        self.spAction.setEnabled(False)
+        self.spAddAction.setChecked(True)
+        
+    def spDeactivate(self):
+        self.spActive = False
+        self.spMouseAction.setEnabled(False)
+        self.spAddAction.setEnabled(False)
+        self.spSubAction.setEnabled(False)
+        self.hidespAction.setEnabled(False)
+        self.spAction.setEnabled(True)
+        self.spMouseAction.setChecked(True)
+        
     def finishAreaChoosing(self):
         """Finish choosing the area, and then enable three editing choices"""
         self.finishChoosingArea = True
@@ -815,6 +1067,9 @@ class MainWindow(QMainWindow):
     def labelPolygon(self):
         """Set mouse action when labelling polygon"""
         if self.sender().isChecked():
+            self.spMouseAction.setChecked(True)
+            self.setMouseAction()
+            
             self.isLaballing = False
             self.notFinishAreaChoosing()
             self.showImage()
@@ -827,6 +1082,20 @@ class MainWindow(QMainWindow):
     def mouseReleasePoly(self, event):
         pass
 
+    def startSPAdd(self,event):
+        """Start labelling sp"""
+        self.imageLabel.setMouseTracking(True)
+        self.lastSpinboxValue = self.zoomSpinBox.value()
+        self.isLaballing = True
+        
+        
+    def stopSPAdd(self, event):
+        """Finish labelling sp"""
+        self.imageLabel.setMouseTracking(False)
+        self.spPosition = event.pos()
+        self.confirmEdit()
+        self.showImage()        
+        
     def startPoly(self, event):
         """Start labelling polygon"""
         self.imageLabel.setMouseTracking(True)
@@ -853,7 +1122,6 @@ class MainWindow(QMainWindow):
         self.lines = []
         self.imageLabel.update()
         self.updateStatus("Choose an irregular polygon area")
-
 
     def setMouseAction(self):
         """Set mouse action when not labelling"""
@@ -885,10 +1153,24 @@ class MainWindow(QMainWindow):
     def finishMove(self, event):
         pass
 
-
+    def labelSPAdd(self):
+        """Set mouse action when adding to superpixel segments"""
+        if self.sender().isChecked():
+            self.mouseAction.setChecked(True)
+            self.setMouseAction()
+            
+            self.isLaballing = False
+            self.notFinishAreaChoosing()
+            self.showImage()
+            self.imageLabel.mousePressEvent = self.startSPAdd
+            self.imageLabel.mouseReleaseEvent = self.stopSPAdd
+    
     def labelRectOrEllipse(self):
         """Set mouse action when labelling rectangle or ellipse"""
         if self.sender().isChecked():
+            self.spMouseAction.setChecked(True)
+            self.setMouseAction()
+            
             self.isLaballing = False
             self.notFinishAreaChoosing()
             self.showImage()
@@ -1025,6 +1307,25 @@ class MainWindow(QMainWindow):
             self.showImage()
             self.notFinishAreaChoosing()
             self.updateStatus("Label selected polygon area")
+        elif self.spAddAction.isChecked():
+            x = int(round(self.spPosition.x() / factor))
+            y = int(round(self.spPosition.y() / factor))
+            label = self.spSegments[y][x]
+            indices = np.argwhere(self.spSegments == label)
+            for i in range(0, len(indices)):
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
+                        self.currentColor.green(), self.currentColor.blue()]
+            self.updateStatus("Superpixel at x:%d y:%d added" % (x, y))
+            #self.updateStatus("Superpixel at x:%d y:%d added, label:%d" % (x, y, label))
+        elif self.spSubAction.isChecked():
+            x = int(round(self.spPosition.x() / factor))
+            y = int(round(self.spPosition.y() / factor))
+            label = self.spSegments[y][x]
+            indices = np.argwhere(self.spSegments == label)
+            for i in range(0, len(indices)):
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(), 
+                                self.backgroundColor.green(), self.backgroundColor.blue()]
+            self.updateStatus("Superpixel at x:%d y:%d removed" % (x, y))
 
         if not self.dirty:
             self.setDirty()
@@ -1224,6 +1525,7 @@ class MainWindow(QMainWindow):
         settings = QSettings()
         fname = unicode(settings.value("LastFile").toString())
         if fname and QFile.exists(fname):
+            self.fileName = fname
             self.cvimage = fname
             self.loadImage(fname)
             self.updateToolBar()
@@ -1241,10 +1543,20 @@ class MainWindow(QMainWindow):
             event.ignore()
 
         else:
-            reply = QMessageBox.question(self, "Exit", "You are going to leave the " +
-                                        "Image Annotation Tool. Are you sure?",
-                                        QMessageBox.Yes | QMessageBox.No)
+            reply = None
+            if self.spMassActive:
+                reply = QMessageBox.question(self, "Exit", "The mass superpixel alogrithm is still running, " + 
+                                                           "leaving will mean having to run full or individually next time." + 
+                                                           "Do you want to exit?",
+                                                            QMessageBox.Yes | QMessageBox.No)
+            else:
+                reply = QMessageBox.question(self, "Exit", "You are going to leave the " +
+                                                           "Image Annotation Tool. Are you sure?",
+                                                            QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.Yes:
+                if self.spMassActive:
+                    i=1
+                
                 settings = QSettings()
                 recentFiles = QVariant(self.recentFiles) \
                             if self.recentFiles else QVariant()
