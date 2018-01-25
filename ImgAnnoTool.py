@@ -62,17 +62,22 @@ class MainWindow(QMainWindow):
         self.filepath = None    # Directory of the image file
         self.dirty = False      # Whether modified
         self.isLoading = True
-        self.isHiding = False
+        self.hideImg = False
+        self.hideSP = False
+        self.hideMask = False
         self.isLaballing = False
         self.finishChoosingArea = False
         self.spActive = False
         self.spNum = 550
         self.spMask = None
-        self.hideSP = False
         self.q = Queue(maxsize=0)
         self.q_Video = Queue(maxsize=0)
         self.num_threads = 5
         self.firstDone = False
+        self.spMassActive = False
+        self.spMassTotal = 0
+        self.spMassComplete = 0
+        self.mutex = QMutex()
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -191,9 +196,12 @@ class MainWindow(QMainWindow):
         showLogViewerAction = self.createAction("&Show Log...", self.showLog, "Alt+K",
                                                 None, "Show log dock")
 
-        self.hideOriginalAction = self.createAction("&Hide\nOriginal", self.hideOriginalImage, "Ctrl+H",
+        self.hideOriginalAction = self.createAction("&Hide\nImage", self.hideButtonClick, "Ctrl+H",
+                                                    "hide", "Hide original image", True, "toggled(bool)")
+        self.hideMaskAction = self.createAction("&Hide\nMask", self.hideButtonClick, "Ctrl+H",
                                                     "hide", "Hide original image", True, "toggled(bool)")
         self.hideOriginalAction.setChecked(False)
+        self.hideMaskAction.setChecked(False)
 
         self.paletteAction = self.createAction("&Palette...", self.chooseColor, "Ctrl+L",
                                           None, "Choose the color to label items")
@@ -210,7 +218,7 @@ class MainWindow(QMainWindow):
         
         self.spAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel", "Run superpixel Algorithm")
         
-        self.hidespAction = self.createAction("&Hide\nSuperpixels", self.hideSuperpixelOverlay, "Alt+H",
+        self.hidespAction = self.createAction("&Hide\nSuperpixels", self.hideButtonClick, "Alt+H",
                                                     "hide", "Hide superpixel overlay", True, "toggled(bool)")
         # Create group of actions for superpixels
         spGroup = QActionGroup(self)   
@@ -250,6 +258,7 @@ class MainWindow(QMainWindow):
         self.mouseAction.setChecked(True)
 
         self.resetableActions = ((self.hideOriginalAction, False),
+                                 (self.hideMaskAction, False),
                                  (self.mouseAction, True),
                                  (self.spMouseAction,True))
 
@@ -295,7 +304,7 @@ class MainWindow(QMainWindow):
                                    self.ellipseLabelAction, self.polygonLabelAction))
 
         viewMenu = self.menuBar().addMenu("&View")
-        self.addActions(viewMenu, (zoomInAction, zoomOutAction, self.hideOriginalAction,
+        self.addActions(viewMenu, (zoomInAction, zoomOutAction, self.hideOriginalAction,self.hideMaskAction,
                                    None, hideLogViewerAction, showLogViewerAction))
 
         helpMenu = self.menuBar().addMenu("&Help")
@@ -310,7 +319,7 @@ class MainWindow(QMainWindow):
         self.toolBar.setObjectName("ToolBar")
         self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, self.undoAction,
                                  quitAction, None, zoomInAction)
-        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, None,
+        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, self.hideMaskAction, None,
                                  self.paletteAction, self.confirmAction, self.deleteAction,
                                  self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
                                  self.ellipseLabelAction, self.polygonLabelAction,None)
@@ -475,6 +484,7 @@ class MainWindow(QMainWindow):
         """Update message on status bar and window title"""
         self.statusBar().showMessage(message, 5000)
         self.listWidget.addItem(message)
+        self.listWidget.scrollToBottom()
         if self.filename is not None:
             self.setWindowTitle("Image Annotation Tool - %s[*]" % \
                                 os.path.basename(self.filename))
@@ -553,22 +563,31 @@ class MainWindow(QMainWindow):
             self.filepath = dirname
             self.allImages = self.scanAllImages(dirname)
             self.fileListWidget.clear()
-            total = len(self.allImages)
+            if self.massSP and not self.spMassActive:
+                self.spMassTotal = len(self.allImages)
+                self.spMassComplete = 0
+                self.spMassActive = True
+                self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
+            else:
+                self.mass = False
+                QMessageBox.warning(self, 'Warning', "Mass superpixel execution already running")
                 
             for imgPath in self.allImages:
                 filename = os.path.basename(imgPath)
                 item = QListWidgetItem(filename)
                 self.fileListWidget.addItem(item)
-                self.q.put(imgPath)
+                if self.massSP:
+                    self.q.put([imgPath,0])
 
             # Open first file
             if len(self.allImages) > 0:
                 if not self.massSP:
                     self.loadImage(self.allImages[0])
                     self.updateToolBar()
-                    self.colorListWidget(self.allImages[0])
+                    self.colorListWidget(self.allImages[0])                  
             else:
                 QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
+                self.spMassActive = False
             self.massSP = False
             
     def scanAllImages(self, imageDir):
@@ -653,17 +672,26 @@ class MainWindow(QMainWindow):
             self.updateStatus("Action stopped: Please rename file.")
             return
         
-        # mass SP on load?
-        msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
-        reply = QMessageBox.question(self, 'Message',
-                    msg, QMessageBox.Yes, QMessageBox.No)
-        self.massSP = True if reply == QMessageBox.Yes else False
-        
         if dirname:
+            # mass SP on load?
+            msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
+            reply = QMessageBox.question(self, 'Message',
+                    msg, QMessageBox.Yes, QMessageBox.No)
+            self.massSP = True if reply == QMessageBox.Yes else False
+            
             self.updateStatus("Open directory: %s" % dirname)
             self.filepath = dirname
             self.allImages = self.scanAllImages(dirname)
             self.fileListWidget.clear()
+            if self.massSP and not self.spMassActive:
+                self.spMassTotal = len(self.allImages)
+                self.spMassComplete = 0
+                self.spMassActive = True
+                self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
+            else:
+                self.mass = False
+                QMessageBox.warning(self, 'Warning', "Mass superpixel execution already running")
+                
             sleep = 5
             count = 0
             for imgPath in self.allImages:
@@ -686,6 +714,7 @@ class MainWindow(QMainWindow):
                     self.colorListWidget(self.allImages[0])
             else:
                 QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
+            self.massSP = False
     
     def runVideoQueue(self, q, progress_callback):
         while True:
@@ -696,7 +725,6 @@ class MainWindow(QMainWindow):
         fname = arg[0]
         reverse = arg[1]
         dirname = arg[2]
-        print("openVideo: " + fname)
         vidcap = cv2.VideoCapture(fname)
         success,image = vidcap.read()
         success = True
@@ -841,7 +869,7 @@ class MainWindow(QMainWindow):
         ret, mask_output = cv2.threshold(gray_output, 2, 255, cv2.THRESH_BINARY)
         masked_output = cv2.bitwise_and(self.outputMask, self.outputMask, mask = mask_output)
         
-        if (masked_output!=0).any():
+        if (masked_output!=0).any() and not self.hideMask:
             inverted = True
             masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask_output)
             temp = cv2.addWeighted(masked_output, 0.6, masked_image_output, 0.4, 0)
@@ -880,7 +908,7 @@ class MainWindow(QMainWindow):
             singlecolor = np.zeros((height, width, 3), np.uint8) # Create a single color image to specify the FF area
             singlecolor[:, :] = [self.currentColor.red(), self.currentColor.green(), self.currentColor.blue()]
             area_FloodFill = cv2.bitwise_and(singlecolor, singlecolor, mask=mask)
-            if self.hideOriginalAction.isChecked():
+            if self.hideImg:
                 output_origin = cv2.bitwise_and(self.outputMask, self.outputMask, mask=mask_inv)
                 dst = cv2.add(output_origin, area_FloodFill)
             else:
@@ -909,7 +937,15 @@ class MainWindow(QMainWindow):
             q.task_done()
             progress_callback.emit(1)
 
-    def loadFirstSPImage(self, null): 
+    def loadFirstSPImage(self, null):
+        self.mutex.lock()
+        self.spMassComplete += 1
+        self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
+        self.mutex.unlock()
+        
+        if self.spMassComplete == self.spMassTotal:
+            self.spMassActive = False
+        
         if not self.firstDone:
             self.firstDone = True
             time.sleep(2)
@@ -936,21 +972,25 @@ class MainWindow(QMainWindow):
     def runSuperpixelAlg(self):
         self.q.put(self.fileName)
             
-    def hideOriginalImage(self):
-        """Hide original image and only show """
+    def hideButtonClick(self):
+        """Handle Hide button clicks"""
         if self.hideOriginalAction.isChecked():
-            self.isHiding = True
+            self.hideImg = True
         else:
-            self.isHiding = False
-        self.showImage()
-        
-    def hideSuperpixelOverlay(self):
+            self.hideImg = False
+            
         if self.hidespAction.isChecked():
             self.hideSP = True
         else: 
             self.hideSP = False
             
+        if self.hideMaskAction.isChecked():
+            self.hideMask = True
+        else: 
+            self.hideMask = False
+            
         self.showImage()
+
 
     def paintLabel(self, event):
         """First paint image, then paint label"""
@@ -1503,10 +1543,20 @@ class MainWindow(QMainWindow):
             event.ignore()
 
         else:
-            reply = QMessageBox.question(self, "Exit", "You are going to leave the " +
-                                        "Image Annotation Tool. Are you sure?",
-                                        QMessageBox.Yes | QMessageBox.No)
+            reply = None
+            if self.spMassActive:
+                reply = QMessageBox.question(self, "Exit", "The mass superpixel alogrithm is still running, " + 
+                                                           "leaving will mean having to run full or individually next time." + 
+                                                           "Do you want to exit?",
+                                                            QMessageBox.Yes | QMessageBox.No)
+            else:
+                reply = QMessageBox.question(self, "Exit", "You are going to leave the " +
+                                                           "Image Annotation Tool. Are you sure?",
+                                                            QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.Yes:
+                if self.spMassActive:
+                    i=1
+                
                 settings = QSettings()
                 recentFiles = QVariant(self.recentFiles) \
                             if self.recentFiles else QVariant()
