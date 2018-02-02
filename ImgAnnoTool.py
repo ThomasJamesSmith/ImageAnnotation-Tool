@@ -44,6 +44,33 @@ except ImportError:
 
 __version__ = '1.0'
 
+class LoadingVideoDialog(QMessageBox):
+
+    def __init__(self, parent= None):
+        super(LoadingVideoDialog, self).__init__()
+        self.checkbox1 = QCheckBox()
+        self.checkbox2 = QCheckBox()
+        self.checkbox3 = QCheckBox()
+        
+        
+        self.setWindowTitle("Loading Video...")
+        self.checkbox1.setText("Do you want to reverse the video?")
+        self.checkbox2.setText("Do you want just the first frame?")
+        self.checkbox3.setText("Do you want to apply the superpixel algorithm?")
+        #Access the Layout of the MessageBox to add the Checkbox
+        layout = self.layout()
+        layout.addWidget(self.checkbox1, 1,1)
+        layout.addWidget(self.checkbox2, 1,2)
+        layout.addWidget(self.checkbox3, 1,3)        
+        self.setStandardButtons(QMessageBox.Cancel |QMessageBox.Ok)
+        self.setDefaultButton(QMessageBox.Cancel)
+        self.setIcon(QMessageBox.Warning)
+
+    def exec_(self, *args, **kwargs):
+        """
+        Override the exec_ method so you can return the value of the checkbox
+        """
+        return QMessageBox.exec_(self, *args, **kwargs), [self.checkbox1.isChecked(),self.checkbox2.isChecked(),self.checkbox3.isChecked()]
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -438,7 +465,7 @@ class MainWindow(QMainWindow):
             self.fileMenu.addSeparator()
             for i, fname in enumerate(recentFiles):
                 action = QAction(QIcon(":/file.png"), "&%d %s" %
-                            (i + 1, QFileInfo(fname).fileName()), self)
+                            (i + 1, QFileInfo(fname).filename()), self)
                 action.setData(QVariant(fname))
                 self.connect(action, SIGNAL("triggered()"),
                              self.loadImage)
@@ -449,6 +476,8 @@ class MainWindow(QMainWindow):
 
     def updateToolBar(self):
         """Update toolbar to show color labels"""
+        if self.filename == None:
+            return
         labels = config.getLabelColor(self.filename)
 
         if labels is None:
@@ -542,47 +571,64 @@ class MainWindow(QMainWindow):
 
 
 
-    def dirOpen(self):
+    def dirOpen(self, fromVid = False, dirname = None, applySP = None):
         """Open a directory and load the first image"""
         if not self.okToContinue():
             return
-
-        dir = os.path.dirname(self.filename) \
-            if self.filename is not None else "."
-        dirname = unicode(QFileDialog.getExistingDirectory(self,
+        if dirname == None:
+            dir = os.path.dirname(self.filename) \
+                if self.filename is not None else "."
+            dirname = unicode(QFileDialog.getExistingDirectory(self,
                                 "Image Annotation Tool - Select Directory", dir))
-             
+
         if dirname:
             # mass SP on load?
-            msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
-            reply = QMessageBox.question(self, 'Message',
+            if applySP == None:
+                msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
+                reply = QMessageBox.question(self, 'Message',
                         msg, QMessageBox.Yes, QMessageBox.No)
-            self.massSP = True if reply == QMessageBox.Yes else False
-        
+                self.massSP = True if reply == QMessageBox.Yes else False
+            else:
+                self.massSP = applySP
+                
             self.updateStatus("Open directory: %s" % dirname)
             self.filepath = dirname
+            time.sleep(2)
             self.allImages = self.scanAllImages(dirname)
             self.fileListWidget.clear()
             if self.massSP and not self.spMassActive:
                 self.spMassTotal = len(self.allImages)
                 self.spMassComplete = 0
                 self.spMassActive = True
+                self.firstDone = False
                 self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
             else:
-                self.mass = False
-                QMessageBox.warning(self, 'Warning', "Mass superpixel execution already running")
+                if self.massSP:
+                    QMessageBox.warning(self, 'Warning', "Mass superpixel execution already running")
+                self.massSP = False
+            
+            count = 0
+            if fromVid and self.massSP:
+                sleep = 5
+            else:
+                sleep = 0
                 
             for imgPath in self.allImages:
                 filename = os.path.basename(imgPath)
                 item = QListWidgetItem(filename)
                 self.fileListWidget.addItem(item)
                 if self.massSP:
-                    self.q.put([imgPath,0])
+                    self.q.put([imgPath, sleep])
+                    if count > self.threadpool.maxThreadCount() and sleep != 0:
+                        sleep = 0
+                    else:
+                        count += 1
 
             # Open first file
             if len(self.allImages) > 0:
                 if not self.massSP:
                     self.loadImage(self.allImages[0])
+                    self.filename = self.allImages[0]
                     self.updateToolBar()
                     self.colorListWidget(self.allImages[0])                  
             else:
@@ -610,6 +656,7 @@ class MainWindow(QMainWindow):
         """Open image if double-clickling the item on files dock"""
         if not self.okToContinue():
             return
+
         path = os.path.join(self.filepath, str(item.text()))
         currIndex = self.allImages.index(path)
         if currIndex < len(self.allImages):
@@ -631,16 +678,31 @@ class MainWindow(QMainWindow):
         vid_formats = ["*.%s" % unicode(format).lower() \
                    for format in QMovie.supportedFormats()]
                    
-        vid_formats = [u'*.mp4']
+        vid_formats = ["*.mp4"]
+        
+        #all_formats = []
+        #all_formats.extend(img_formats)
+        #all_formats.extend(vid_formats)
+        
+        
         fname = unicode(QFileDialog.getOpenFileName(self,
                             "Image Annotation Tool - Choose Image", dir,
                             "Image files (%s) ;; Video files (%s)" % (" ".join(img_formats), " ".join(vid_formats))))
+                            #"All supported formats (%s) ;; Image files (%s) ;; Video files (%s)" % (" ".join(all_formats) ," ".join(img_formats), " ".join(vid_formats))))
         if fname.endswith(".mp4"):
             self.loadVideo(fname)
         else:
+            self.filename = fname.replace("/","\\")
+            self.allImages = []
+            self.allImages.append(self.filename)
             self.fileListWidget.clear()
+            filename = os.path.basename(fname)
+            item = QListWidgetItem(filename)
+            self.fileListWidget.addItem(item)
+            
             self.loadImage(fname)
             self.updateToolBar()
+            self.colorListWidget(fname) 
 
     def loadVideo(self, fname=None):
         fsplit = fname.split("/")
@@ -648,11 +710,17 @@ class MainWindow(QMainWindow):
         fsplit[len(fsplit)-1]=nsplit[0]
         dirname="/".join(fsplit) + "/"
         
-        msg = "Do you want to reverse the video?"
-        reply = QMessageBox.question(self, 'Message',
-                        msg, QMessageBox.Yes, QMessageBox.No)
+        dialog = LoadingVideoDialog()
+        answer = dialog.exec_()
+        reverse = answer[1][0]
+        firstFrame = answer[1][1]
+        applySP = answer[1][2]
+        
+        #msg = "Do you want to reverse the video?"
+        #reply = QMessageBox.question(self, 'Message',
+        #                msg, QMessageBox.Yes, QMessageBox.No)
 
-        reverse = True if reply == QMessageBox.Yes else False
+        #reverse = True if reply == QMessageBox.Yes else False
         
         useDir = True
         if os.path.exists(dirname):
@@ -667,54 +735,13 @@ class MainWindow(QMainWindow):
             self.updateStatus("Directory created: %s" % dirname)
         
         if useDir:
-            self.q_Video.put([fname, reverse, dirname])
+            self.q_Video.put([fname, reverse, dirname, firstFrame])
         else:
             self.updateStatus("Action stopped: Please rename file.")
             return
         
         if dirname:
-            # mass SP on load?
-            msg = "Do you want to apply superpixels to entire directory? \nWarning this will delete any perviously labeled frames."
-            reply = QMessageBox.question(self, 'Message',
-                    msg, QMessageBox.Yes, QMessageBox.No)
-            self.massSP = True if reply == QMessageBox.Yes else False
-            
-            self.updateStatus("Open directory: %s" % dirname)
-            self.filepath = dirname
-            self.allImages = self.scanAllImages(dirname)
-            self.fileListWidget.clear()
-            if self.massSP and not self.spMassActive:
-                self.spMassTotal = len(self.allImages)
-                self.spMassComplete = 0
-                self.spMassActive = True
-                self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
-            else:
-                self.mass = False
-                QMessageBox.warning(self, 'Warning', "Mass superpixel execution already running")
-                
-            sleep = 5
-            count = 0
-            for imgPath in self.allImages:
-                filename = os.path.basename(imgPath)
-                item = QListWidgetItem(filename)
-                self.fileListWidget.addItem(item)
-                if self.massSP:
-                    self.q.put([imgPath, sleep])
-                    
-                    if count > self.threadpool.maxThreadCount():
-                        sleep = 0
-                    else:
-                        count += 1
-
-            if len(self.allImages) > 0:
-                if not self.massSP:
-                    self.updateStatus("Open directory: %s" % dirname)
-                    self.loadImage(self.allImages[0])
-                    self.updateToolBar()
-                    self.colorListWidget(self.allImages[0])
-            else:
-                QMessageBox.warning(self, 'Error', "[ERROR]: No images in %s" % dirname)
-            self.massSP = False
+            self.dirOpen(True, dirname, applySP)
     
     def runVideoQueue(self, q, progress_callback):
         while True:
@@ -725,6 +752,8 @@ class MainWindow(QMainWindow):
         fname = arg[0]
         reverse = arg[1]
         dirname = arg[2]
+        firstFrame = arg[3]
+        
         vidcap = cv2.VideoCapture(fname)
         success,image = vidcap.read()
         success = True
@@ -751,6 +780,8 @@ class MainWindow(QMainWindow):
         
         for i in range(start, end, step):
             cv2.imwrite(dirname + "%05d.jpg" % name, frames[i])
+            if firstFrame:
+                break
             name += 1
 
     def loadImage(self, fname=None):
@@ -809,7 +840,14 @@ class MainWindow(QMainWindow):
                 cv2.cvtColor(self.outputMask, cv2.COLOR_BGR2RGB, self.outputMask)
                 self.isLoading = True
                 self.showImage()
-                self.filename = fname
+                self.filename = fname.replace("/", "\\")
+                self.filepath = os.path.dirname(self.filename)
+                self.allImages = []
+                self.allImages.append(self.filename)
+                self.fileListWidget.clear()
+                filename = os.path.basename(fname)
+                item = QListWidgetItem(filename)
+                self.fileListWidget.addItem(item)
                 self.dirty = False
 
                 message = "Loaded %s" % os.path.basename(fname)
@@ -945,6 +983,7 @@ class MainWindow(QMainWindow):
         
         if self.spMassComplete == self.spMassTotal:
             self.spMassActive = False
+            spMassComplete = 0
         
         if not self.firstDone:
             self.firstDone = True
@@ -952,15 +991,17 @@ class MainWindow(QMainWindow):
             if not len(self.allImages) == 0:
                 self.loadImage(self.allImages[0])
             else:
-                self.loadImage(self.fileName)
+                self.loadImage(self.filename)
             self.spActivate()
     
     def runMassSuperpixelAlg(self, arg):
         dir = arg[0]
         time.sleep(arg[1])
+        
         img = cv2.imread(dir.decode('utf-8').encode('gbk'))
         if not os.path.exists(config.outputDir(dir)):
-                    os.makedirs(config.outputDir(dir))
+            os.makedirs(config.outputDir(dir))
+            
         output = np.zeros(img.shape, np.uint8)
         segments = slic(img, n_segments = self.spNum, sigma=1, compactness=40)
         path = config.outputFile(dir)
@@ -970,7 +1011,12 @@ class MainWindow(QMainWindow):
         cv2.imwrite(config.outputFile(dir).decode('utf-8').encode('gbk'), output)
         
     def runSuperpixelAlg(self):
-        self.q.put(self.fileName)
+        self.firstDone = False
+        self.q.put([self.filename,0])
+        self.spMassTotal = len(self.allImages)
+        self.spMassComplete = 0
+        self.spMassActive = True
+        self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
             
     def hideButtonClick(self):
         """Handle Hide button clicks"""
@@ -1525,7 +1571,15 @@ class MainWindow(QMainWindow):
         settings = QSettings()
         fname = unicode(settings.value("LastFile").toString())
         if fname and QFile.exists(fname):
-            self.fileName = fname
+            self.filename = fname.replace("/", "\\")
+            self.filepath = os.path.dirname(self.filename)
+            self.allImages = []
+            self.allImages.append(self.filename)
+            self.fileListWidget.clear()
+            filename = os.path.basename(fname)
+            item = QListWidgetItem(filename)
+            self.fileListWidget.addItem(item)
+            
             self.cvimage = fname
             self.loadImage(fname)
             self.updateToolBar()
