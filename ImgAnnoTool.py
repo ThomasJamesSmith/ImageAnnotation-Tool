@@ -761,8 +761,8 @@ class MainWindow(QMainWindow):
         while success:
             success,image = vidcap.read()
             if success:
-                image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
-                frames.insert(len(frames),image2)
+                #image2 = cv2.resize(image,(640,360), interpolation = cv2.INTER_CUBIC)
+                frames.insert(len(frames),image)
         
         start = 0
         end = len(frames)-1
