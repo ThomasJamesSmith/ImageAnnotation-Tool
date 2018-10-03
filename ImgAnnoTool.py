@@ -31,6 +31,7 @@ from Queue import Queue
 #from threading import Thread
 import time
 from worker import *
+import pdb
 
 # RECOMMAND: Use PyQt4
 try:
@@ -615,7 +616,7 @@ class MainWindow(QMainWindow):
                 
             self.updateStatus("Open directory: %s" % dirname)
             self.filepath = dirname
-            time.sleep(2)
+            time.sleep(5)
             if image_video:
                 # mass SP on load?
                 if applySP == None:
@@ -647,8 +648,7 @@ class MainWindow(QMainWindow):
                 if fromVid and self.massSP:
                     sleep = 5
                 else:
-                    sleep = 0
-                    
+                    sleep = 1
                 for imgPath in self.allImages:
                     filename = os.path.basename(imgPath)
                     item = QListWidgetItem(filename)
@@ -660,7 +660,8 @@ class MainWindow(QMainWindow):
                         else:
                             count += 1
 
-                # Open first file
+                #
+                #  first file
                 if len(self.allImages) > 0:
                     if not self.massSP:
                         self.loadImage(self.allImages[0])
@@ -772,19 +773,15 @@ class MainWindow(QMainWindow):
         nsplit = fsplit[len(fsplit)-1].split(".")
         fsplit[len(fsplit)-1]=nsplit[0]
         dirname="/".join(fsplit) + "/"
-        
+
         if not loadingMultiVideos or self.loadMultiVideoAns == []:
             dialog = LoadingVideoDialog()
             answer = dialog.exec_()
-            reverse = answer[1][0]
-            firstFrame = answer[1][1]
-            applySP = answer[1][2]
-            if loadingMultiVideos:
-                self.loadMultiVideoAns = answer[1]
-        else:
-            reverse = self.loadMultiVideoAns[0]
-            firstFrame = self.loadMultiVideoAns[1]
-            applySP = self.loadMultiVideoAns[2]
+            self.loadMultiVideoAns = answer[1]
+
+        reverse = self.loadMultiVideoAns[0]
+        firstFrame = self.loadMultiVideoAns[1]
+        applySP = self.loadMultiVideoAns[2]
         
         #msg = "Do you want to reverse the video?"
         #reply = QMessageBox.question(self, 'Message',
@@ -1074,7 +1071,7 @@ class MainWindow(QMainWindow):
         
         if not self.firstDone:
             self.firstDone = True
-            time.sleep(2)
+            time.sleep(5)
             if not len(self.allImages) == 0:
                 self.loadImage(self.allImages[0])
             else:
@@ -1669,7 +1666,7 @@ class MainWindow(QMainWindow):
             
             self.cvimage = fname
             self.loadImage(fname)
-            self.updateToolBar()
+        self.updateToolBar()
 
 
     def mouseWheelEvent(self, event):
