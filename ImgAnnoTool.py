@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
         self.spMask = None
         self.q = Queue(maxsize=0)
         self.q_Video = Queue(maxsize=0)
-        self.num_threads = 6
+        self.num_threads = 7
         self.firstDone = False
         self.spMassActive = False
         self.spMassTotal = 0
@@ -122,7 +122,8 @@ class MainWindow(QMainWindow):
         self.videoTotal = 0
         self.loadingVideoActive = False
         self.videoName = ""
-        self.reverse = False        
+        self.reverse = False
+        self.sp_queue = []
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -407,7 +408,7 @@ class MainWindow(QMainWindow):
         self.imageLabel.wheelEvent = self.mouseWheelEvent
         
         self.threadpool = QThreadPool()
-        for i in range(self.num_threads-1):
+        for i in range(self.num_threads-2):
             worker = Worker(self.runMassSuperpixelQueue, self.q)
             worker.signals.progress.connect(self.loadFirstSPImage)
 
@@ -416,6 +417,7 @@ class MainWindow(QMainWindow):
         self.workerVideo = Worker(self.runVideoQueue, self.q_Video)
         self.workerVideo.signals.progress.connect(self.loadedVideo)
         self.threadpool.start(self.workerVideo)
+
         
 ###############################################################################
 ###############################################################################
@@ -854,7 +856,7 @@ class MainWindow(QMainWindow):
             if firstFrame:
                 break
             name += 1
-            
+
     def loadedVideo(self, dir):
         self.mutex.lock()
         self.videoComplete += 1
@@ -1212,19 +1214,44 @@ class MainWindow(QMainWindow):
     def mouseReleasePoly(self, event):
         pass
 
-    def startSPAdd(self,event):
+    def getLabel(self, pos):
+        factor = self.lastSpinboxValue * 1.0 / 100
+        x = int(round(pos.x() / factor))
+        y = int(round(pos.y() / factor))
+        label = self.spSegments[y][x]
+        return label, x, y
+
+
+    def addSP(self):
+        label, x, y = self.getLabel(self.spPosition)
+
+        for i in range(len(self.sp_queue)):
+            if self.sp_queue[i] == label:
+                return
+        self.sp_queue.append(label)
+        self.confirmEdit()
+        self.showImage()
+
+
+    def startSPAdd(self, event):
         """Start labelling sp"""
         self.imageLabel.setMouseTracking(True)
         self.lastSpinboxValue = self.zoomSpinBox.value()
         self.isLaballing = True
-        
-        
+        self.spPosition = event.pos()
+        self.addSP()
+
+    def DragSPADD(self, event):
+        self.spPosition = event.pos()
+        self.addSP()
+
+
     def stopSPAdd(self, event):
         """Finish labelling sp"""
         self.imageLabel.setMouseTracking(False)
-        self.spPosition = event.pos()
-        self.confirmEdit()
-        self.showImage()        
+        self.sp_queue = []
+        #self.confirmEdit()
+        #self.showImage()
         
     def startPoly(self, event):
         """Start labelling polygon"""
@@ -1293,6 +1320,7 @@ class MainWindow(QMainWindow):
             self.notFinishAreaChoosing()
             self.showImage()
             self.imageLabel.mousePressEvent = self.startSPAdd
+            self.imageLabel.mouseMoveEvent = self.DragSPADD
             self.imageLabel.mouseReleaseEvent = self.stopSPAdd
     
     def labelRectOrEllipse(self):
@@ -1438,9 +1466,7 @@ class MainWindow(QMainWindow):
             self.notFinishAreaChoosing()
             self.updateStatus("Label selected polygon area")
         elif self.spAddAction.isChecked():
-            x = int(round(self.spPosition.x() / factor))
-            y = int(round(self.spPosition.y() / factor))
-            label = self.spSegments[y][x]
+            label, x, y = self.getLabel(self.spPosition)
             indices = np.argwhere(self.spSegments == label)
             for i in range(0, len(indices)):
                 self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
@@ -1448,12 +1474,10 @@ class MainWindow(QMainWindow):
             self.updateStatus("Superpixel at x:%d y:%d added" % (x, y))
             #self.updateStatus("Superpixel at x:%d y:%d added, label:%d" % (x, y, label))
         elif self.spSubAction.isChecked():
-            x = int(round(self.spPosition.x() / factor))
-            y = int(round(self.spPosition.y() / factor))
-            label = self.spSegments[y][x]
+            label, x, y = self.getLabel(self.spPosition)
             indices = np.argwhere(self.spSegments == label)
             for i in range(0, len(indices)):
-                self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(), 
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(),
                                 self.backgroundColor.green(), self.backgroundColor.blue()]
             self.updateStatus("Superpixel at x:%d y:%d removed" % (x, y))
 
