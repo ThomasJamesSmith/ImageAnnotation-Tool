@@ -860,7 +860,7 @@ class MainWindow(QMainWindow):
     def loadedVideo(self, dir):
         self.mutex.lock()
         self.videoComplete += 1
-        self.updateStatus("Video progress: %d/%d" %(self.videoComplete, self.videoTotal))
+        self.updateStatus("Video progress: %d/%d" % (self.videoComplete, self.videoTotal))
         self.mutex.unlock()
         self.dirOpen(True, dir, self.loadMultiVideoAns[2])
         
