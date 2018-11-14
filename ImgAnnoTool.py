@@ -14,6 +14,9 @@
 #   have option to remove segment from mask
 #
 
+# compile new icons
+# C:\Python27\Lib\site-packages\PyQt4\pyrcc4.exe -o qrc_resources.py resources.qrc
+
 import os
 import platform
 import sys
@@ -27,13 +30,14 @@ from skimage.segmentation import slic
 from skimage.segmentation import mark_boundaries
 from skimage import io
 import sip
+import scipy
 from Queue import Queue
 #from threading import Thread
 import time
 from worker import *
 import pdb
 
-# RECOMMAND: Use PyQt4
+# RECOMMEND: Use PyQt4
 try:
     from PyQt4.QtCore import *
     from PyQt4.QtGui import *
@@ -43,7 +47,8 @@ except ImportError:
     from PyQt5.QtWidgets import *
 
 
-__version__ = '1.1'
+__version__ = '1.2'
+
 
 class OpeningDirDialog(QMessageBox):
     def __init__(self, parent=None):
@@ -83,6 +88,7 @@ class LoadingVideoDialog(QMessageBox):
         Override the exec_ method so you can return the value of the checkbox
         """
         return QMessageBox.exec_(self, *args, **kwargs), [self.checkbox1.isChecked(),self.checkbox2.isChecked(),self.checkbox3.isChecked()]
+
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -266,22 +272,48 @@ class MainWindow(QMainWindow):
         
         self.hidespAction = self.createAction("&Hide\nSuperpixels", self.hideButtonClick, "Alt+H",
                                                     "hide", "Hide superpixel overlay", True, "toggled(bool)")
+
+
         # Create group of actions for superpixels
-        spGroup = QActionGroup(self)   
+        spGroup = QActionGroup(self)
+        #
         self.spMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+p",
                                                "cursor", "No Action", True, "toggled(bool)")        
         spGroup.addAction(self.spMouseAction)
+        #
         self.spAddAction = self.createAction("&Add \nSuperpixel", self.labelSPAdd, "Ctrl+{",
-                                                     "SPadd", "Add superpixel to segment", True, "toggled(bool)")
+                                             "SPadd", "Add superpixel to segment", True, "toggled(bool)")
         spGroup.addAction(self.spAddAction)
+        #
         self.spSubAction = self.createAction("&Subtract \nSuperpixel", self.labelSPAdd, "Ctrl+}", 
-                                                     "SPsub", "Subtract superpixel to segment", True, "toggled(bool)")
+                                             "SPsub", "Subtract superpixel from segment", True, "toggled(bool)")
         spGroup.addAction(self.spSubAction)
+        #
         self.spMouseAction.setChecked(True)
         self.spMouseAction.setEnabled(False)
         self.spAddAction.setEnabled(False)
         self.spSubAction.setEnabled(False)
         self.hidespAction.setEnabled(False)
+
+        clusterGroup = QActionGroup(self)
+        self.clusterAction = self.createAction("&Cluster", self.openClusters, "Alt+s", "cluster",
+                                               "add cluster overlay")
+        self.clusterMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+c",
+                                                    "cursor", "No Action", True, "toggled(bool)")
+        clusterGroup.addAction(self.clusterMouseAction)
+
+        self.clusterAddAction = self.createAction("&Add \nCluster", self.labelClusterAdd, "Ctrl+{",
+                                                  "SPadd", "Add cluster to segment", True, "toggled(bool)")
+        clusterGroup.addAction(self.clusterAddAction)
+        self.clusterSubAction = self.createAction("&Subtract \nCluster", self.labelClusterSub, "Ctrl+}",
+                                                  "SPsub", "Subtract cluster frp, segment", True, "toggled(bool)")
+        clusterGroup.addAction(self.clusterSubAction)
+
+        self.clusterMouseAction.setChecked(True)
+        self.clusterMouseAction.setEnabled(False)
+        self.clusterAddAction.setEnabled(False)
+        self.clusterSubAction.setEnabled(False)
+
         
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
@@ -306,7 +338,8 @@ class MainWindow(QMainWindow):
         self.resetableActions = ((self.hideOriginalAction, False),
                                  (self.hideMaskAction, False),
                                  (self.mouseAction, True),
-                                 (self.spMouseAction,True))
+                                 (self.spMouseAction, True),
+                                 (self.clusterMouseAction, True))
 
         # Set spin box
         self.zoomSpinBox = QSpinBox()
@@ -371,11 +404,16 @@ class MainWindow(QMainWindow):
                                  self.ellipseLabelAction, self.polygonLabelAction,None)
         self.toolBarActions_3 = (self.spAction, self.hidespAction, self.spMouseAction,
                                  self.spAddAction, self.spSubAction, None)
+
+        self.toolBarActions_4 = (self.clusterAction, self.clusterMouseAction,
+                                 self.clusterAddAction, self.clusterSubAction, None)
+
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_2)
         self.toolBar.addWidget(self.spSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_3)
+        self.addActions(self.toolBar, self.toolBarActions_4)
 
         self.colorLabelBar = QToolBar("Labels and colors")
         self.addToolBar(Qt.LeftToolBarArea, self.colorLabelBar)
@@ -428,7 +466,6 @@ class MainWindow(QMainWindow):
         self.dirty = True
         self.saveAction.setEnabled(True)
 
-
     def setClean(self):
         """Call this method when saving changes"""
         self.dirty = False
@@ -436,10 +473,7 @@ class MainWindow(QMainWindow):
         self.historyStack = []
         self.undoAction.setEnabled(False)
 
-
-    def createAction(self, text, slot=None, shortcut=None,
-                     icon=None, tip=None, checkable=False,
-                     signal="triggered()"):
+    def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal="triggered()"):
         """Quickly create action"""
         action = QAction(text,self)
         if slot == self.chooseColor:
@@ -459,7 +493,6 @@ class MainWindow(QMainWindow):
             action.setCheckable(True)
         return action
 
-
     def addActions(self, target, actions):
         """Add actions to menu bars or tool bars"""
         for action in actions:
@@ -467,7 +500,6 @@ class MainWindow(QMainWindow):
                 target.addSeparator()
             else:
                 target.addAction(action)
-    
 
     def updateFileMenu(self):
         """Update file menu to show recent open files"""
@@ -491,7 +523,6 @@ class MainWindow(QMainWindow):
                 self.fileMenu.addAction(action)
         self.fileMenu.addSeparator()
         self.fileMenu.addAction(self.fileMenuActions[-1])
-
 
     def updateToolBar(self):
         """Update toolbar to show color labels"""
@@ -517,7 +548,6 @@ class MainWindow(QMainWindow):
                 self.labelsGroup.addAction(action)
                 self.colorLabelDict[action] = labels[label]
 
-
     def addRecentFile(self, fname):
         """Add files to recentfile array"""
         if fname is None:
@@ -526,7 +556,6 @@ class MainWindow(QMainWindow):
             self.recentFiles.prepend(QString(fname))
             while self.recentFiles.count() > 9:
                 self.recentFiles.takeLast()
-
 
     def updateStatus(self, message):
         """Update message on status bar and window title"""
@@ -539,7 +568,6 @@ class MainWindow(QMainWindow):
         else:
             self.setWindowTitle("Image Annotation Tool[*]")
         self.setWindowModified(self.dirty)
-
 
     def okToContinue(self):
         """Check if there is unsaved change"""
@@ -556,7 +584,6 @@ class MainWindow(QMainWindow):
 
         return True
 
-
     def saveFile(self):
         """Save file to the directory which is specified in config.py"""
         if self.outputMask is None:
@@ -572,7 +599,6 @@ class MainWindow(QMainWindow):
         self.updateStatus("Save to %s" % config.outputFile(self.filename))
         self.setClean()
 
-
     def colorListWidget(self, current):
         """Use different color to label files in list:
         Red: Unlabelled. Green: Labelled. Blue: Current"""
@@ -587,8 +613,6 @@ class MainWindow(QMainWindow):
             else:
                 item.setForeground(Qt.red)
                 item.setIcon(QIcon(":/delete.png"))
-
-
 
     def dirOpen(self, fromVid = False, dirname = None, applySP = None):
         """Open a directory and load the first image"""
@@ -714,7 +738,6 @@ class MainWindow(QMainWindow):
                     videos.append(relativePath)
         videos.sort(key=lambda x: x.lower())
         return videos
-
 
     def fileItemDoubleClicked(self, item=None):
         """Open image if double-clickling the item on files dock"""
@@ -940,7 +963,6 @@ class MainWindow(QMainWindow):
             self.updateStatus(message)
             self.setClean()
 
-
     def showImage(self, percent=None):
         """Transfer opencv image into QImage and update to draw on imagelabel"""
         if self.cvimage is None:
@@ -982,7 +1004,6 @@ class MainWindow(QMainWindow):
         self.imageLabel.setMinimumSize(width, height)
         self.imageLabel.setMaximumSize(width, height)
         self.imageLabel.update()
-
 
     def applyMask(self):
         """Apply mask to origin image and get the displayable image"""
@@ -1041,7 +1062,6 @@ class MainWindow(QMainWindow):
 
         return dst
 
-
     def undo(self):
         """Undo the last changes to the image"""
         old = self.historyStack.pop(-1)
@@ -1054,7 +1074,7 @@ class MainWindow(QMainWindow):
     def updateSPNum(self):
         self.spNum = self.spSpinBox.value()
         self.spAction.setEnabled(True)
-    
+
     def runMassSuperpixelQueue(self, q, progress_callback):
         while True:
             self.runMassSuperpixelAlg(q.get())
@@ -1079,7 +1099,7 @@ class MainWindow(QMainWindow):
             else:
                 self.loadImage(self.filename)
             self.spActivate()
-    
+
     def runMassSuperpixelAlg(self, arg):
         dir = arg[0]
         time.sleep(arg[1])
@@ -1095,7 +1115,7 @@ class MainWindow(QMainWindow):
         np.savetxt(pathSplit[0] + ".csv", segments, delimiter=",", fmt="%d")        
         output = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
         cv2.imwrite(config.outputFile(dir).decode('utf-8').encode('gbk'), output)
-        
+
     def runSuperpixelAlg(self):
         self.firstDone = False
         self.q.put([self.filename,0])
@@ -1103,7 +1123,7 @@ class MainWindow(QMainWindow):
         self.spMassComplete = 0
         self.spMassActive = True
         self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
-            
+
     def hideButtonClick(self):
         """Handle Hide button clicks"""
         if self.hideOriginalAction.isChecked():
@@ -1122,7 +1142,6 @@ class MainWindow(QMainWindow):
             self.hideMask = False
             
         self.showImage()
-
 
     def paintLabel(self, event):
         """First paint image, then paint label"""
@@ -1169,7 +1188,7 @@ class MainWindow(QMainWindow):
         self.hidespAction.setEnabled(True)
         self.spAction.setEnabled(False)
         self.spAddAction.setChecked(True)
-        
+
     def spDeactivate(self):
         self.spActive = False
         self.spMouseAction.setEnabled(False)
@@ -1178,14 +1197,13 @@ class MainWindow(QMainWindow):
         self.hidespAction.setEnabled(False)
         self.spAction.setEnabled(True)
         self.spMouseAction.setChecked(True)
-        
+
     def finishAreaChoosing(self):
         """Finish choosing the area, and then enable three editing choices"""
         self.finishChoosingArea = True
         self.confirmAction.setEnabled(True)
         self.deleteAction.setEnabled(True)
         self.floodFillAction.setEnabled(True)
-
 
     def notFinishAreaChoosing(self):
         """Not finish choosing areas"""
@@ -1194,7 +1212,6 @@ class MainWindow(QMainWindow):
         self.deleteAction.setEnabled(False)
         self.floodFillAction.setChecked(False)
         self.floodFillAction.setEnabled(False)
-
 
     def labelPolygon(self):
         """Set mouse action when labelling polygon"""
@@ -1210,7 +1227,6 @@ class MainWindow(QMainWindow):
             self.imageLabel.mouseReleaseEvent = self.mouseReleasePoly
             self.imageLabel.mouseDoubleClickEvent = self.finishPoly
 
-
     def mouseReleasePoly(self, event):
         pass
 
@@ -1221,7 +1237,6 @@ class MainWindow(QMainWindow):
         label = self.spSegments[y][x]
         return label, x, y
 
-
     def addSP(self):
         label, x, y = self.getLabel(self.spPosition)
 
@@ -1231,7 +1246,6 @@ class MainWindow(QMainWindow):
         self.sp_queue.append(label)
         self.confirmEdit()
         self.showImage()
-
 
     def startSPAdd(self, event):
         """Start labelling sp"""
@@ -1245,14 +1259,13 @@ class MainWindow(QMainWindow):
         self.spPosition = event.pos()
         self.addSP()
 
-
     def stopSPAdd(self, event):
         """Finish labelling sp"""
         self.imageLabel.setMouseTracking(False)
         self.sp_queue = []
         #self.confirmEdit()
         #self.showImage()
-        
+
     def startPoly(self, event):
         """Start labelling polygon"""
         self.imageLabel.setMouseTracking(True)
@@ -1309,6 +1322,127 @@ class MainWindow(QMainWindow):
 
     def finishMove(self, event):
         pass
+
+    def openClusters(self):
+        self.updateStatus("Open Cluster")
+        split_file_dir = self.filename.split('.')
+        avg_path = split_file_dir[0] + "_avg." + split_file_dir[1]
+        pred_path = split_file_dir[0] + "_prediction." + split_file_dir[1]
+        avg = io.imread(avg_path)
+        pred = io.imread(pred_path)
+
+        # self.spMask = avg
+        self.spSegments = self.avgToSegments(avg)
+        self.spActivate()
+        for i in range(self.outputMask.shape[2]):
+            self.outputMask[:, :, i] = pred
+        self.confirmEdit()
+
+    def findLabel(self, x, y):
+        if x == 0 and y == 0:
+            return 1
+        # print x, y
+        if not self.segMask[x][y] == 0:
+            return self.segMask[x][y]
+        same = []
+        # left
+        if (not x == 0) and \
+            not self.segMask[x-1][y] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x-1][y]):
+                same.append([-1, 0, self.segMask[x-1][y]])
+        # upper left
+        if (not x == 0 and not y == 0) and \
+            not self.segMask[x - 1][y - 1] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x - 1][y - 1]):
+                same.append([-1, -1, self.segMask[x-1][y-1]])
+        # up
+        if (not y == 0) and \
+            not self.segMask[x][y-1] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x][y-1]):
+                same.append([0, -1, self.segMask[x][y-1]])
+        # upper right
+        if (not x == self.segMaskAvg.shape[0]-1 and not y == 0) and \
+            not self.segMask[x + 1][y - 1] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x + 1][y - 1]):
+                same.append([1, -1, self.segMask[x+1][y-1]])
+
+        # right
+        if (not x == self.segMaskAvg.shape[0]-1) and \
+            not self.segMask[x + 1][y] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x + 1][y]):
+                same.append([1, 0, self.segMask[x+1][y]])
+        # lower right
+        if (not x == self.segMaskAvg.shape[0] - 1 and not y == self.segMaskAvg.shape[1] - 1) and \
+            not self.segMask[x + 1][y + 1] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x+1][y+1]):
+                same.append([1, 1, self.segMask[x+1][y+1]])
+        # down
+        if (not y == self.segMaskAvg.shape[1] - 1) and \
+            not self.segMask[x][y + 1] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x][y+1]):
+                same.append([0, 1, self.segMask[x][y+1]])
+        # lower left
+        if (not x == 0 and not y == self.segMaskAvg.shape[1] - 1) and \
+            not self.segMask[x - 1][y + 1] == 0 and \
+            np.all(self.segMaskAvg[x][y] == self.segMaskAvg[x - 1][y + 1]):
+            same.append([-1, 1, self.segMask[x-1][y+1]])
+
+        if len(same) == 0:
+            label = self.avgNextLabel
+            self.avgNextLabel += 1
+            return label
+        same = np.array(same)
+        labels = same[:, 2]
+        if np.all(labels == labels[0]):
+            return int(labels[0])
+
+        mask = self.segMask.reshape(self.segMask.shape[0]*self.segMask.shape[1])
+        sorted_labels = np.sort(labels)
+        for i in range(1, len(sorted_labels)):
+            label = sorted_labels[i]
+            indices = np.where(mask == label)
+            for index in indices:
+                mask[index] = sorted_labels[0]
+
+        self.segMask = mask.reshape(self.segMask.shape[0], self.segMask.shape[1])
+        return sorted_labels[0]
+
+    def avgToSemgentHelper(self, rec=1, label=1, x=0, y=0, r=False):
+        for y in range(0, self.segMaskAvg.shape[1]):
+            for x in range(0, self.segMaskAvg.shape[0]):
+                if x == 0 and y == 0:
+                    self.segMask[x][y] = 1
+                    continue
+                # next_x = x + 1
+                # next_y = y
+                if (not x == self.segMaskAvg.shape[0] - 1): # and np.all(self.segMaskAvg[x][y] == self.segMaskAvg[next_x][next_y]):
+                    self.segMask[x][y] = self.findLabel(x, y)
+
+    def avgToSegments(self, avg):
+        avg_2 = avg.reshape(avg.shape[0] * avg.shape[1], avg.shape[2])
+        avg_3 = np.unique(avg_2, axis=0)
+        self.segMask = np.zeros((avg.shape[0], avg.shape[1]))
+        self.avgNextLabel = 2
+        self.segMaskAvg = avg.copy()
+        self.avgToSemgentHelper(1)
+        self.updateStatus("avgToSegments complete")
+        return self.segMask
+
+        segements = np.zeros((avg.shape[0] * avg.shape[1]))
+
+        for j in range(len(avg_3)):
+            cluster = avg_3[j]
+            indices = np.where(np.all(avg_2 == cluster, axis=1))
+            for index in indices:
+                segements[index] = j
+        segements_2 = segements.reshape(avg.shape[0], avg.shape[1])
+        return segements_2
+
+    def labelClusterAdd(self):
+        tom = 93
+
+    def labelClusterSub(self):
+        tom = 93
 
     def labelSPAdd(self):
         """Set mouse action when adding to superpixel segments"""
@@ -1384,7 +1518,6 @@ class MainWindow(QMainWindow):
             self.updateStatus("Choose an ellipse area")
         self.finishAreaChoosing()
 
-
     def confirmEdit(self):
         """Confirm the change you just made"""
         if not self.isLaballing:
@@ -1440,7 +1573,6 @@ class MainWindow(QMainWindow):
             self.showImage()
             self.notFinishAreaChoosing()
             self.updateStatus("Label selected rectangle area")
-
         elif self.ellipseLabelAction.isChecked():
             cv2.ellipse(self.outputMask,
                         ((topleft_x + bottomright_x) / 2, (topleft_y + bottomright_y) / 2),
@@ -1451,7 +1583,6 @@ class MainWindow(QMainWindow):
             self.showImage()
             self.notFinishAreaChoosing()
             self.updateStatus("Label selected ellipse area")
-
         elif self.polygonLabelAction.isChecked():
             pts = []
             for point in self.points:
@@ -1484,7 +1615,6 @@ class MainWindow(QMainWindow):
         if not self.dirty:
             self.setDirty()
         self.undoAction.setEnabled(True)
-
 
     def deleteLabel(self):
         """Unlabel the chosen area"""
@@ -1535,7 +1665,6 @@ class MainWindow(QMainWindow):
             self.setDirty()
         self.undoAction.setEnabled(True)
 
-
     def changeFloodFill(self):
         """Change flood fill configuration --
         difference of pixel values in different colors"""
@@ -1543,7 +1672,6 @@ class MainWindow(QMainWindow):
         self.greenDiff = self.floodFillConfig.getGreenValue()
         self.blueDiff = self.floodFillConfig.getBlueValue()
         self.showImage()
-
 
     def createFloodFillMask(self):
         """Create and return a mask for flood fill action"""
@@ -1572,7 +1700,6 @@ class MainWindow(QMainWindow):
 
         return mask
 
-
     def setFloodFillAction(self):
         """Set mouse action for flood fill"""
         if self.floodFillAction.isChecked():
@@ -1600,10 +1727,8 @@ class MainWindow(QMainWindow):
                 self.polygonLabelAction.setChecked(False)
                 self.polygonLabelAction.setChecked(True)
 
-
     def doubleClickFF(self, event):
         pass
-
 
     def mousePressFF(self, event):
         self.pointFF = event.pos()
@@ -1612,14 +1737,11 @@ class MainWindow(QMainWindow):
         self.floodFillConfig.setEnabled()
         self.showImage()
 
-
     def mouseMoveFF(self, event):
         pass
 
-
     def mouseReleaseFF(self, event):
         pass
-
 
     def chooseColor(self):
         """Use a palette to choose labelling color"""
@@ -1637,7 +1759,6 @@ class MainWindow(QMainWindow):
             if self.floodFillAction.isChecked():
                 self.showImage()
 
-
     def chooseColor_2(self):
         """Choose and use a user specified labelling color"""
         action = self.sender()
@@ -1650,13 +1771,11 @@ class MainWindow(QMainWindow):
             icon.fill(self.currentColor)
             self.paletteAction.setIcon(QIcon(icon))
 
-
     def showLog(self):
         self.logDockWidget.show()
 
     def hideLog(self):
         self.logDockWidget.hide()
-
 
     def zoomIn(self):
         """Zoom in by 5%"""
@@ -1665,14 +1784,12 @@ class MainWindow(QMainWindow):
         else:
             self.zoomSpinBox.setValue(self.zoomSpinBox.maximum())
 
-
     def zoomOut(self):
         """Zoom out by 5%"""
         if self.zoomSpinBox.value() - 5 > self.zoomSpinBox.minimum():
             self.zoomSpinBox.setValue(self.zoomSpinBox.value() - 5)
         else:
             self.zoomSpinBox.setValue(self.zoomSpinBox.minimum())
-
 
     def loadInitFile(self):
         """Load the last file before closing last time."""
@@ -1692,12 +1809,10 @@ class MainWindow(QMainWindow):
             self.loadImage(fname)
         self.updateToolBar()
 
-
     def mouseWheelEvent(self, event):
         """Use mouse wheel to zoom the image"""
         changes = event.delta() / 120
         self.zoomSpinBox.setValue(self.zoomSpinBox.value() + changes * 2)
-
 
     def closeEvent(self, event):
         """Before closing pop out a message box to comfirm"""
@@ -1735,7 +1850,6 @@ class MainWindow(QMainWindow):
             elif reply == QMessageBox.No:
                 event.ignore()
 
-
     def helpAbout(self):
         QMessageBox.about(self, "About Image Annotation Tool",
                                 """<b>Image Annotation Tool</b> v %s
@@ -1756,7 +1870,6 @@ class MainWindow(QMainWindow):
                           4. Confirm, unlabel or perform flood-fill.\n
                           5. Save image when finish annotating.
                           <p>For details, please check user manual in docs folder.""")
-
 
 
 def main():

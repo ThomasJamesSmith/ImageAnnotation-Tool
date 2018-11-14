@@ -1,0 +1,152 @@
+[33mcommit 8ea5bc404efc87cad3d56fcbc15024bc69719651[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m)[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Wed Nov 14 11:14:16 2018 +0000
+
+    added functionality to loop over prediction and add it to mask
+
+[33mcommit abfd46365a5f098a8f3a6ab2e13ee66c0e44f831[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Fri Nov 9 16:34:55 2018 +0000
+
+    adding clusters
+
+[33mcommit 0c1f029041c94d2f850ce65e687f8c19b096edd6[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Merge: 5ecda15 9d8c3f0
+Author: psxts3 <psxts3@exmail.nottingham.ac.uk>
+Date:   Fri Oct 5 09:01:47 2018 +0100
+
+    Merge branch 'first_frame' into 'master'
+    
+    First frame functionality
+    
+    See merge request psxts3/annotation-tool!1
+
+[33mcommit 9d8c3f078e31c21ce13076549193e4c856062432[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Wed Oct 3 16:44:46 2018 +0100
+
+    click and drag reimplimented
+
+[33mcommit eb98ec59a3f93e9ff1b26d092d8538ef150c0c4b[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Wed Oct 3 15:46:11 2018 +0100
+
+    loading video and applying sp bug fix
+
+[33mcommit 5bd7d5314a51c2129e84ebbeec28b7054b4fc7c9[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Mon Feb 5 13:57:35 2018 +0000
+
+    Added functionallity to mass load videos and apply superpixels to them
+
+[33mcommit 47e6e2577f55aef81ce78cee97d542f213bda637[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Fri Feb 2 13:04:30 2018 +0000
+
+    Removed resizing of video, takes much longer
+
+[33mcommit 86b35f2c7a519c4787cfb49ed768f1941a0c4c61[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Fri Feb 2 12:58:56 2018 +0000
+
+    Fixed issues with image superpixel not working correctly. Added ability to chose if to do whole video or first frame.
+
+[33mcommit 5ecda15922179e63a03abe9361146fc2998b3f9b[m
+Merge: 9538911 97011f0
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Thu Jan 25 13:32:48 2018 +0000
+
+    Merge branch 'superpixels' into 'master'
+    
+    Superpixels
+    
+    See merge request psxts3/Annotation-Tool!2
+
+[33mcommit 97011f0be3a6957456b653c4ffbbc3a121d66acb[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Thu Jan 25 11:04:10 2018 +0000
+
+    updated hiding to work with single handling function. Added button to hide mask. Added progress for mass SP. Fixed bug where log didn't scroll to show newest post. added popup message if mass sp is running when trying to exit to inform user that it is still running.
+
+[33mcommit 70b79d7ab1987f72f24f82b7c4288d0d4ac50c07[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Wed Jan 24 15:29:14 2018 +0000
+
+    MULTITHREADING WORKING
+
+[33mcommit 84c2f0d8fa6f760a85a49f313e82dfdb9aa56eb5[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Mon Jan 22 16:12:16 2018 +0000
+
+    Added ability to mass run superpixels when loading a directory to reduce time while labelling, need to add feature where it runs in background so that you can continue to label whilst it running. MULTITHREADING!
+
+[33mcommit b3dd8bbadf4ec6bcf3c3fa91ac6fc89b240b158c[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Fri Jan 19 14:36:42 2018 +0000
+
+    Fixed not activating sp buttons when loading csv.
+
+[33mcommit bcae1ed4776be7a75490c81b2414d0ce0c7db8c5[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Fri Jan 19 14:32:27 2018 +0000
+
+    Added load functionality for superpixel csv
+
+[33mcommit b9726300ef959758286b8d7f6992f73d972bb9dd[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Thu Jan 18 16:40:15 2018 +0000
+
+    added save superpixel to csv. Added ability to choose how many superpixels. changed ratio for overlay to 6:4.
+
+[33mcommit 1f481e5671e7a32957d550e83f07ca6baf7c1403[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Wed Jan 17 17:10:58 2018 +0000
+
+    Added superpixel add and remove buttons. Both buttons fully implimented. And intergrates with existing segmentation selectors. Need to add sp greyout when changing image.
+
+[33mcommit d64d708f637502fbb7e5771626b98c70856a3337[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Tue Jan 16 12:54:07 2018 +0000
+
+    Added superpixel button and code to run on currenly loaded image. Then displays the sp over the current image and is compatible with the original segmentation overlay
+
+[33mcommit 5bc601cd4d27f545da29795534ca26a59acbc407[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Fri Jan 12 15:20:25 2018 +0000
+
+    Added SP button and used resources.qrc to add icon to program. REMEMBER to compile this file to update qrc_resources.py by typing 'pyrcc4 -py3 resources.qrc -o qrc_resources.py'
+
+[33mcommit 353b83ec40893d59ad8514a69ead39d21ca348c3[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Thu Jan 11 16:20:05 2018 +0000
+
+    Updated videos to 640x360. Found superpixel code to use SLIC. Added some warning for overwriting data.
+
+[33mcommit 9538911c12db1b7fe0792aa5223211eaf05d5ee0[m
+Merge: 05e35db 259ccfe
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Thu Jan 11 12:11:20 2018 +0000
+
+    Merge branch 'load-video' into 'master'
+    
+    Load video
+    
+    See merge request psxts3/Annotation-Tool!1
+
+[33mcommit 259ccfec96b17548fcffee4c9fb28223ed9c5b02[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Thu Jan 11 11:53:10 2018 +0000
+
+    Fixed indexing error when reversing video, updated cv2.cv.CV_ to cv2.COLOR
+
+[33mcommit db6fad38936d427ff26682fa595e4e7c4c5a93bb[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Wed Jan 10 16:15:32 2018 +0000
+
+    Loading of video, reversing option, saving frames and loading into system implimented.
+
+[33mcommit 05e35dbdc44239c903a244af451e9e2b977176f7[m
+Author: Thomas Smith <psxts3@exmail.nottingham.ac.uk>
+Date:   Wed Jan 10 11:41:04 2018 +0000
+
+    Initial Commit

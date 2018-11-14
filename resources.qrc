@@ -22,5 +22,6 @@
 		<file alias="helpabout.png">icons/helpabout.png</file>
         <file alias="SPadd.png">icons/SPadd.png</file>
         <file alias="SPsub.png">icons/SPsub.png</file>
+        <file alias="cluster.png">icons/cluster.png</file>
     </qresource>
 </RCC>
