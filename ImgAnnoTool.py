@@ -109,12 +109,14 @@ class MainWindow(QMainWindow):
         self.isLoading = True
         self.hideImg = False
         self.hideSP = False
+        self.hideCluster = False
         self.hideMask = False
         self.isLaballing = False
         self.finishChoosingArea = False
         self.spActive = False
         self.spNum = 550
         self.spMask = None
+        self.clusterMask = None
         self.q = Queue(maxsize=0)
         self.q_Video = Queue(maxsize=0)
         self.num_threads = 7
@@ -130,6 +132,7 @@ class MainWindow(QMainWindow):
         self.videoName = ""
         self.reverse = False
         self.sp_queue = []
+        self.cluster_queue = []
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
@@ -295,6 +298,7 @@ class MainWindow(QMainWindow):
         self.spSubAction.setEnabled(False)
         self.hidespAction.setEnabled(False)
 
+        # Create group of actions for cluster
         clusterGroup = QActionGroup(self)
         self.clusterAction = self.createAction("&Cluster", self.openClusters, "Alt+s", "cluster",
                                                "add cluster overlay")
@@ -305,14 +309,18 @@ class MainWindow(QMainWindow):
         self.clusterAddAction = self.createAction("&Add \nCluster", self.labelClusterAdd, "Ctrl+{",
                                                   "SPadd", "Add cluster to segment", True, "toggled(bool)")
         clusterGroup.addAction(self.clusterAddAction)
-        self.clusterSubAction = self.createAction("&Subtract \nCluster", self.labelClusterSub, "Ctrl+}",
+        self.clusterSubAction = self.createAction("&Subtract \nCluster", self.labelClusterAdd, "Ctrl+}",
                                                   "SPsub", "Subtract cluster frp, segment", True, "toggled(bool)")
         clusterGroup.addAction(self.clusterSubAction)
+
+        self.hideClusterAction = self.createAction("&Hide\nCluster", self.hideButtonClick, "Alt+H",
+                                                   "hide", "Hide cluster overlay", True, "toggled(bool)")
 
         self.clusterMouseAction.setChecked(True)
         self.clusterMouseAction.setEnabled(False)
         self.clusterAddAction.setEnabled(False)
         self.clusterSubAction.setEnabled(False)
+        self.hideClusterAction.setEnabled(False)
 
         
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
@@ -405,7 +413,7 @@ class MainWindow(QMainWindow):
         self.toolBarActions_3 = (self.spAction, self.hidespAction, self.spMouseAction,
                                  self.spAddAction, self.spSubAction, None)
 
-        self.toolBarActions_4 = (self.clusterAction, self.clusterMouseAction,
+        self.toolBarActions_4 = (self.clusterAction, self.hideClusterAction, self.clusterMouseAction,
                                  self.clusterAddAction, self.clusterSubAction, None)
 
         self.addActions(self.toolBar, self.toolBarActions_1)
@@ -931,13 +939,15 @@ class MainWindow(QMainWindow):
                 dirSplit = dir.split('.')
                 if os.path.exists(dirSplit[0] + ".csv"):
                     self.spSegments = np.int64(np.genfromtxt(dirSplit[0] + ".csv", delimiter=','))
-                    self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments, color=(1,0,0)))*255
+                    self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments, color=(1, 0, 0)))*255
+
                     self.spActivate()
                 else:
                     self.spDeactivate()
                     self.spSegments = None
                     self.spMask = None
-                    
+                self.regionSegments = None
+
                 self.addRecentFile(self.filename)
                 self.sizeLabel.setText("Image size: %d x %d" %
                                        (self.cvimage.shape[1], self.cvimage.shape[0]))
@@ -1012,13 +1022,13 @@ class MainWindow(QMainWindow):
         
         gray_output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2GRAY)
         ret, mask_output = cv2.threshold(gray_output, 2, 255, cv2.THRESH_BINARY)
-        masked_output = cv2.bitwise_and(self.outputMask, self.outputMask, mask = mask_output)
+        masked_output = cv2.bitwise_and(self.outputMask, self.outputMask, mask=mask_output)
         
         if (masked_output!=0).any() and not self.hideMask:
             inverted = True
-            masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask = mask_output)
+            masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask=mask_output)
             temp = cv2.addWeighted(masked_output, 0.6, masked_image_output, 0.4, 0)
-            origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask = cv2.bitwise_not(mask_output))
+            origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask=cv2.bitwise_not(mask_output))
             dst = cv2.add(temp, origin)
             
         if self.spMask is not None and not self.hideSP: # and show sp
@@ -1029,6 +1039,23 @@ class MainWindow(QMainWindow):
             masked_sp = cv2.bitwise_and(self.spMask, self.spMask, mask = mask_sp)
             masked_out_sp = cv2.bitwise_and(dst, dst, mask = mask_sp_inverted)
             dst = cv2.add(masked_sp, masked_out_sp)
+
+        if self.regionSegments is not None and not self.hideCluster:  # and show sp
+            ### change to overlay
+            inverted = True
+            alpha = 0.5
+            alpha_channel = np.full((self.clusterMask.shape[0], self.clusterMask.shape[1], 1), alpha)
+            alpha_cluster = np.dstack((self.clusterMask, alpha_channel))
+            output = dst.copy()
+            cv2.addWeighted(self.clusterMask, alpha, dst, 1 - alpha, 0, output)
+            dst = output
+
+             # gray_cluster = cv2.cvtColor(self.clusterMask, cv2.COLOR_RGB2GRAY)
+             # ret, mask_cluster = cv2.threshold(gray_cluster, 2, 255, cv2.THRESH_BINARY)
+             # mask_cluster_inverted = cv2.bitwise_not(mask_cluster)
+             # masked_cluster = cv2.bitwise_and(self.clusterMask, self.clusterMask, mask=mask_cluster)
+             # masked_out_cluster = cv2.bitwise_and(dst, dst, mask=mask_cluster_inverted)
+             # dst = cv2.add(masked_cluster, masked_out_cluster)
 
         if self.choosingPointFF:
             factor = self.chooseFFPointSpinBoxValue * 1.0 / 100
@@ -1135,6 +1162,11 @@ class MainWindow(QMainWindow):
             self.hideSP = True
         else: 
             self.hideSP = False
+
+        if self.hideClusterAction.isChecked():
+            self.hideCluster = True
+        else:
+            self.hideSP = False
             
         if self.hideMaskAction.isChecked():
             self.hideMask = True
@@ -1230,42 +1262,6 @@ class MainWindow(QMainWindow):
     def mouseReleasePoly(self, event):
         pass
 
-    def getLabel(self, pos):
-        factor = self.lastSpinboxValue * 1.0 / 100
-        x = int(round(pos.x() / factor))
-        y = int(round(pos.y() / factor))
-        label = self.spSegments[y][x]
-        return label, x, y
-
-    def addSP(self):
-        label, x, y = self.getLabel(self.spPosition)
-
-        for i in range(len(self.sp_queue)):
-            if self.sp_queue[i] == label:
-                return
-        self.sp_queue.append(label)
-        self.confirmEdit()
-        self.showImage()
-
-    def startSPAdd(self, event):
-        """Start labelling sp"""
-        self.imageLabel.setMouseTracking(True)
-        self.lastSpinboxValue = self.zoomSpinBox.value()
-        self.isLaballing = True
-        self.spPosition = event.pos()
-        self.addSP()
-
-    def DragSPADD(self, event):
-        self.spPosition = event.pos()
-        self.addSP()
-
-    def stopSPAdd(self, event):
-        """Finish labelling sp"""
-        self.imageLabel.setMouseTracking(False)
-        self.sp_queue = []
-        #self.confirmEdit()
-        #self.showImage()
-
     def startPoly(self, event):
         """Start labelling polygon"""
         self.imageLabel.setMouseTracking(True)
@@ -1323,17 +1319,42 @@ class MainWindow(QMainWindow):
     def finishMove(self, event):
         pass
 
+    def clusterActivate(self):
+        self.clusterActive = True
+        self.clusterMouseAction.setEnabled(True)
+        self.clusterSubAction.setEnabled(True)
+        self.clusterAddAction.setEnabled(True)
+        self.hideClusterAction.setEnabled(True)
+        self.clusterAction.setEnabled(False)
+        self.clusterAddAction.setChecked(True)
+
+    def clusterDeactivate(self):
+        self.clusterActive = False
+        self.clusterMouseAction.setEnabled(False)
+        self.clusterAddAction.setEnabled(False)
+        self.clusterSubAction.setEnabled(False)
+        self.hideClusterAction.setEnabled(False)
+        self.clusterAction.setEnabled(True)
+        self.clusterMouseAction.setChecked(True)
+
     def openClusters(self):
         self.updateStatus("Open Cluster")
         split_file_dir = self.filename.split('.')
         avg_path = split_file_dir[0] + "_avg." + split_file_dir[1]
         pred_path = split_file_dir[0] + "_prediction." + split_file_dir[1]
+        if not QFile.exists(avg_path):
+            self.updateStatus("Average superpixel image does not exist: " + avg_path)
+            return
+        if not QFile.exists(pred_path):
+            self.updateStatus("Predication output image does not exist: " + pred_path)
+            return
         avg = io.imread(avg_path)
         pred = io.imread(pred_path)
+        self.clusterMask = avg
 
         # self.spMask = avg
-        self.spSegments = self.avgToSegments(avg)
-        self.spActivate()
+        self.regionSegments = self.avgToSegments(avg)
+        self.clusterActivate()
         for i in range(self.outputMask.shape[2]):
             self.outputMask[:, :, i] = pred
         self.confirmEdit()
@@ -1439,10 +1460,82 @@ class MainWindow(QMainWindow):
         return segements_2
 
     def labelClusterAdd(self):
-        tom = 93
+        """Set mouse action when adding to superpixel segments"""
+        if self.sender().isChecked():
+            self.mouseAction.setChecked(True)
+            self.setMouseAction()
 
-    def labelClusterSub(self):
-        tom = 93
+            self.isLaballing = False
+            self.notFinishAreaChoosing()
+            self.showImage()
+            self.imageLabel.mousePressEvent = self.startClusterAdd
+            self.imageLabel.mouseMoveEvent = self.DragClusterADD
+            self.imageLabel.mouseReleaseEvent = self.stopClusterAdd
+
+    def addCluster(self):
+        print self.clusterPosition.x(),self.clusterPosition.y()
+        for i in range(len(self.cluster_queue)):
+            if self.cluster_queue[i] == label:
+                return
+        self.cluster_queue.append(label)
+        self.confirmEdit()
+        self.showImage()
+
+    def startClusterAdd(self, event):
+        """Start labelling sp"""
+        self.imageLabel.setMouseTracking(True)
+        self.isLaballing = True
+        self.clusterPosition = event.pos()
+        self.addCluster()
+
+    def DragClusterADD(self, event):
+        self.clusterPosition = event.pos()
+        self.addCluster()
+
+    def stopClusterAdd(self, event):
+        """Finish labelling sp"""
+        self.imageLabel.setMouseTracking(False)
+        self.cluster_queue = []
+        #self.confirmEdit()
+        #self.showImage()
+
+    def getLabel(self, pos):
+        factor = self.zoomSpinBox.value() * 1.0 / 100.0
+        x = int(round(pos.x() / factor))
+        y = int(round(pos.y() / factor))
+        if self.spAddAction.isChecked() or self.spSubAction.isChecked():
+            label = self.spSegments[y][x]
+        elif self.clusterAddAction.isChecked() or self.clusterSubAction.isChecked():
+            label = self.regionSegments[y][x]
+        return label, x, y
+
+    def addSP(self):
+        label, x, y = self.getLabel(self.spPosition)
+        for i in range(len(self.sp_queue)):
+            if self.sp_queue[i] == label:
+                return
+        self.sp_queue.append(label)
+        self.confirmEdit()
+        self.showImage()
+
+    def startSPAdd(self, event):
+        """Start labelling sp"""
+        self.imageLabel.setMouseTracking(True)
+        self.lastSpinboxValue = self.zoomSpinBox.value()
+        self.isLaballing = True
+        self.spPosition = event.pos()
+        self.addSP()
+
+    def DragSPADD(self, event):
+        self.spPosition = event.pos()
+        self.addSP()
+
+    def stopSPAdd(self, event):
+        """Finish labelling sp"""
+        self.imageLabel.setMouseTracking(False)
+        self.sp_queue = []
+        #self.confirmEdit()
+        #self.showImage()
 
     def labelSPAdd(self):
         """Set mouse action when adding to superpixel segments"""
@@ -1609,9 +1702,25 @@ class MainWindow(QMainWindow):
             indices = np.argwhere(self.spSegments == label)
             for i in range(0, len(indices)):
                 self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(),
-                                self.backgroundColor.green(), self.backgroundColor.blue()]
+                                                                 self.backgroundColor.green(),
+                                                                 self.backgroundColor.blue()]
             self.updateStatus("Superpixel at x:%d y:%d removed" % (x, y))
-
+        elif self.clusterAddAction.isChecked():
+            self.updateStatus("updating add cluster")
+            label, x, y = self.getLabel(self.clusterPosition)
+            indices = np.argwhere(self.regionSegments == label)
+            for i in range(0, len(indices)):
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
+                                                                 self.currentColor.green(),
+                                                                 self.currentColor.blue()]
+        elif self.clusterSubAction.isChecked():
+            self.updateStatus("updating sub cluster")
+            label, x, y = self.getLabel(self.clusterPosition)
+            indices = np.argwhere(self.regionSegments == label)
+            for i in range(0, len(indices)):
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(),
+                                                                 self.backgroundColor.green(),
+                                                                 self.backgroundColor.blue()]
         if not self.dirty:
             self.setDirty()
         self.undoAction.setEnabled(True)
