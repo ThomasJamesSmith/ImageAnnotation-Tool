@@ -23,6 +23,7 @@ import sys
 import qrc_resources
 import numpy as np
 import cv2
+import csv
 import config
 from colorDialog import *
 from FloodFillConfig import *
@@ -107,9 +108,11 @@ class MainWindow(QMainWindow):
         self.filepath = None    # Directory of the image file
         self.dirty = False      # Whether modified
         self.isLoading = True
+        self.colourLabels = None
         self.hideImg = False
         self.hideSP = False
         self.hideCluster = False
+        self.showSuggestedCluster = False
         self.hideMask = False
         self.isLaballing = False
         self.finishChoosingArea = False
@@ -117,6 +120,7 @@ class MainWindow(QMainWindow):
         self.spNum = 550
         self.spMask = None
         self.clusterMask = None
+        self.suggestedClusterMask = None
         self.q = Queue(maxsize=0)
         self.q_Video = Queue(maxsize=0)
         self.num_threads = 7
@@ -315,13 +319,25 @@ class MainWindow(QMainWindow):
 
         self.hideClusterAction = self.createAction("&Hide\nCluster", self.hideButtonClick, "Alt+H",
                                                    "hide", "Hide cluster overlay", True, "toggled(bool)")
+        self.showSuggestedClusterAction = self.createAction("&Show\nSuggested\nCluster", self.hideButtonClick, "Alt+H",
+                                                            "hide", "Show suggested cluster overlay", True, "toggled(bool)")
 
         self.clusterMouseAction.setChecked(True)
         self.clusterMouseAction.setEnabled(False)
         self.clusterAddAction.setEnabled(False)
         self.clusterSubAction.setEnabled(False)
         self.hideClusterAction.setEnabled(False)
+        self.showSuggestedClusterAction.setEnabled(False)
 
+        labelGroup = QActionGroup(self)
+        self.labelAction = self.createAction("&Open\nLabels", self.editLabelFile, "Alt+f", "labels",
+                                             "Open label file, create if doesn't exist")
+        labelGroup.addAction(self.labelAction)
+
+        self.labelAddAction = self.createAction("&Add \nSuperpixel", self.labelToFileAdd, "Ctrl+{",
+                                             "SPadd", "Add new semantic label to labels file", True)
+        labelGroup.addAction(self.labelAddAction)
+        self.labelAddAction.setEnabled(False)
         
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
@@ -363,7 +379,7 @@ class MainWindow(QMainWindow):
                      SIGNAL("valueChanged(int)"), self.showImage)
 
         self.lastSpinboxValue = self.zoomSpinBox.value()
-        
+
         self.spSpinBox = QSpinBox()
         self.spSpinBox.setRange(100, 1000)
         self.spSpinBox.setValue(550)
@@ -373,6 +389,39 @@ class MainWindow(QMainWindow):
         self.connect(self.spSpinBox,
                      SIGNAL("valueChanged(int)"), self.updateSPNum)
         self.spNum = self.spSpinBox.value()
+
+        # Label spin boxes
+        self.labelRedSpinBox = QSpinBox()
+        self.labelRedSpinBox.setRange(0, 255)
+        self.labelRedSpinBox.setValue(0)
+        self.labelRedSpinBox.setToolTip("Set red value for label")
+        self.labelRedSpinBox.setStatusTip(self.labelRedSpinBox.toolTip())
+        self.labelRedSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.labelRedSpinBox, SIGNAL("valueChanged(int)"), self.updateLabelNums)
+        self.labelRedNum = self.labelRedSpinBox.value()
+        self.labelRedSpinBox.setEnabled(False)
+
+        self.labelGreenSpinBox = QSpinBox()
+        self.labelGreenSpinBox.setRange(0, 255)
+        self.labelGreenSpinBox.setValue(0)
+        self.labelGreenSpinBox.setToolTip("Set green value for label")
+        self.labelGreenSpinBox.setStatusTip(self.labelGreenSpinBox.toolTip())
+        self.labelGreenSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.labelGreenSpinBox, SIGNAL("valueChanged(int)"), self.updateLabelNums)
+        self.labelGreenNum = self.labelGreenSpinBox.value()
+        self.labelGreenSpinBox.setEnabled(False)
+
+        self.labelBlueSpinBox = QSpinBox()
+        self.labelBlueSpinBox.setRange(0, 255)
+        self.labelBlueSpinBox.setValue(0)
+        self.labelBlueSpinBox.setToolTip("Set blue value for label")
+        self.labelBlueSpinBox.setStatusTip(self.labelBlueSpinBox.toolTip())
+        self.labelBlueSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.labelBlueSpinBox, SIGNAL("valueChanged(int)"), self.updateLabelNums)
+        self.labelBlueNum = self.labelBlueSpinBox.value()
+        self.labelBlueSpinBox.setEnabled(False)
+        self.labelName = "New Name"
+
 
         # Create color dialog
         self.colorDialog = ColorDialog(parent=self)
@@ -413,8 +462,9 @@ class MainWindow(QMainWindow):
         self.toolBarActions_3 = (self.spAction, self.hidespAction, self.spMouseAction,
                                  self.spAddAction, self.spSubAction, None)
 
-        self.toolBarActions_4 = (self.clusterAction, self.hideClusterAction, self.clusterMouseAction,
-                                 self.clusterAddAction, self.clusterSubAction, None)
+        self.toolBarActions_4 = (self.clusterAction, self.hideClusterAction, self.showSuggestedClusterAction,
+                                 self.clusterMouseAction, self.clusterAddAction, self.clusterSubAction, None)
+        self.toolBarActions_5 = (self.labelAction, self.labelAddAction, None)
 
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
@@ -422,6 +472,10 @@ class MainWindow(QMainWindow):
         self.toolBar.addWidget(self.spSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_3)
         self.addActions(self.toolBar, self.toolBarActions_4)
+        self.addActions(self.toolBar, self.toolBarActions_5)
+        self.toolBar.addWidget(self.labelRedSpinBox)
+        self.toolBar.addWidget(self.labelGreenSpinBox)
+        self.toolBar.addWidget(self.labelBlueSpinBox)
 
         self.colorLabelBar = QToolBar("Labels and colors")
         self.addToolBar(Qt.LeftToolBarArea, self.colorLabelBar)
@@ -536,25 +590,30 @@ class MainWindow(QMainWindow):
         """Update toolbar to show color labels"""
         if self.filename == None:
             return
-        labels = config.getLabelColor(self.filename)
+        if self.colourLabels is None:
+            self.colourLabels = config.getLabelColor(self.filename)
 
-        if labels is None:
+        if self.colourLabels is None:
             self.colorLabelBar.hide()
         else:
+            self.labelAddAction.setEnabled(True)
+            self.labelRedSpinBox.setEnabled(True)
+            self.labelGreenSpinBox.setEnabled(True)
+            self.labelBlueSpinBox.setEnabled(True)
             self.colorLabelBar.clear()
             self.colorLabelBar.show()
             self.labelsGroup = QActionGroup(self)
             self.colorLabelDict= {}
-            for label in labels.keys():
+            for label in self.colourLabels.keys():
                 action = self.createAction(label, self.chooseColor_2, None,
                                                        None, "Color the label with user specified color",
                                                        True, "toggled(bool)")
                 icon = QPixmap(50, 50)
-                icon.fill(labels[label])
+                icon.fill(self.colourLabels[label])
                 action.setIcon(QIcon(icon))
                 self.colorLabelBar.addAction(action)
                 self.labelsGroup.addAction(action)
-                self.colorLabelDict[action] = labels[label]
+                self.colorLabelDict[action] = self.colourLabels[label]
 
     def addRecentFile(self, fname):
         """Add files to recentfile array"""
@@ -576,6 +635,7 @@ class MainWindow(QMainWindow):
         else:
             self.setWindowTitle("Image Annotation Tool[*]")
         self.setWindowModified(self.dirty)
+        print message
 
     def okToContinue(self):
         """Check if there is unsaved change"""
@@ -1031,7 +1091,7 @@ class MainWindow(QMainWindow):
             origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask=cv2.bitwise_not(mask_output))
             dst = cv2.add(temp, origin)
             
-        if self.spMask is not None and not self.hideSP: # and show sp
+        if self.spMask is not None and not self.hideSP:  # and show sp
             inverted = True
             gray_sp = cv2.cvtColor(self.spMask, cv2.COLOR_RGB2GRAY)
             ret, mask_sp = cv2.threshold(gray_sp, 2, 255, cv2.THRESH_BINARY)
@@ -1040,22 +1100,27 @@ class MainWindow(QMainWindow):
             masked_out_sp = cv2.bitwise_and(dst, dst, mask = mask_sp_inverted)
             dst = cv2.add(masked_sp, masked_out_sp)
 
-        if self.regionSegments is not None and not self.hideCluster:  # and show sp
+        if self.regionSegments is not None and not self.hideCluster and not self.showSuggestedCluster:  # and show clusters
             ### change to overlay
             inverted = True
+            # print np.ndarray.min(self.clusterMask)
+            # print np.ndarray.max(self.clusterMask)
+            print self.clusterMask.shape
             alpha = 0.5
-            alpha_channel = np.full((self.clusterMask.shape[0], self.clusterMask.shape[1], 1), alpha)
-            alpha_cluster = np.dstack((self.clusterMask, alpha_channel))
+            # alpha_channel = np.full((self.clusterMask.shape[0], self.clusterMask.shape[1], 1), alpha)
+            # alpha_cluster = np.dstack((self.clusterMask, alpha_channel))
             output = dst.copy()
-            cv2.addWeighted(self.clusterMask, alpha, dst, 1 - alpha, 0, output)
+            cv2.addWeighted(self.clusterMask, alpha, output, 1 - alpha, 0, output)
+            dst = output
+        elif self.suggestedClusterMask is not None and self.showSuggestedCluster:  # and show suggested cluster only
+            alpha = 0.5
+            # alpha_channel = np.full((self.suggestedClusterMask.shape[0], self.suggestedClusterMask.shape[1], 1), alpha)
+            # alpha_cluster = np.dstack((self.suggestedClusterMask, alpha_channel))
+            print self.clusterMask.shape
+            output = dst.copy()
+            cv2.addWeighted(self.suggestedClusterMask, alpha, output, 1 - alpha, 0, output)
             dst = output
 
-             # gray_cluster = cv2.cvtColor(self.clusterMask, cv2.COLOR_RGB2GRAY)
-             # ret, mask_cluster = cv2.threshold(gray_cluster, 2, 255, cv2.THRESH_BINARY)
-             # mask_cluster_inverted = cv2.bitwise_not(mask_cluster)
-             # masked_cluster = cv2.bitwise_and(self.clusterMask, self.clusterMask, mask=mask_cluster)
-             # masked_out_cluster = cv2.bitwise_and(dst, dst, mask=mask_cluster_inverted)
-             # dst = cv2.add(masked_cluster, masked_out_cluster)
 
         if self.choosingPointFF:
             factor = self.chooseFFPointSpinBoxValue * 1.0 / 100
@@ -1097,6 +1162,11 @@ class MainWindow(QMainWindow):
         self.updateStatus("Undo")
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
+
+    def updateLabelNums(self):
+        self.labelRedNum = self.labelRedSpinBox.value()
+        self.labelGreenNum = self.labelGreenSpinBox.value()
+        self.labelBlueNum = self.labelBlueSpinBox.value()
 
     def updateSPNum(self):
         self.spNum = self.spSpinBox.value()
@@ -1166,7 +1236,13 @@ class MainWindow(QMainWindow):
         if self.hideClusterAction.isChecked():
             self.hideCluster = True
         else:
-            self.hideSP = False
+            self.hideCluster = False
+
+        if self.showSuggestedClusterAction.isChecked():
+            self.showSuggestedCluster = True
+        else:
+            self.showSuggestedCluster = False
+
             
         if self.hideMaskAction.isChecked():
             self.hideMask = True
@@ -1319,12 +1395,29 @@ class MainWindow(QMainWindow):
     def finishMove(self, event):
         pass
 
+    def labelToFileAdd(self):
+        imgRoot = os.path.dirname(self.filename)
+        path = os.path.join(imgRoot, "label.txt")
+        self.append_to_csv(path, [self.labelRedNum, self.labelGreenNum, self.labelBlueNum, self.labelName])
+        self.updateToolBar()
+
+    def editLabelFile(self):
+        self.colourLabels = config.getLabelColor(self.filename)
+        if self.colourLabels is None:
+            imgRoot = os.path.dirname(self.filename)
+            path = os.path.join(imgRoot, "label.txt")
+            self.append_to_csv(path, [0, 0, 0, "unknown"])
+
+        self.updateToolBar()
+
+
     def clusterActivate(self):
         self.clusterActive = True
         self.clusterMouseAction.setEnabled(True)
         self.clusterSubAction.setEnabled(True)
         self.clusterAddAction.setEnabled(True)
         self.hideClusterAction.setEnabled(True)
+        self.showSuggestedClusterAction.setEnabled(True)
         self.clusterAction.setEnabled(False)
         self.clusterAddAction.setChecked(True)
 
@@ -1334,6 +1427,7 @@ class MainWindow(QMainWindow):
         self.clusterAddAction.setEnabled(False)
         self.clusterSubAction.setEnabled(False)
         self.hideClusterAction.setEnabled(False)
+        self.showSuggestedClusterAction.setEnabled(False)
         self.clusterAction.setEnabled(True)
         self.clusterMouseAction.setChecked(True)
 
@@ -1350,13 +1444,23 @@ class MainWindow(QMainWindow):
             return
         avg = io.imread(avg_path)
         pred = io.imread(pred_path)
+        pred_2 = self.normalise(pred, 255)
+        pred_2 = pred_2.astype(int)
         self.clusterMask = avg
-
+        self.suggestedClusterMask = np.zeros(avg.shape)
         # self.spMask = avg
         self.regionSegments = self.avgToSegments(avg)
+        # for i in range(self.outputMask.shape[2]):
+            # self.outputMask[:, :, i] = pred
+        self.suggestedClusterMask[:, :, 1] = pred_2
+
+        self.suggestedClusterMask = self.suggestedClusterMask.astype(np.uint8)
+
+        # for i in range(self.clusterMask.shape[0]):
+        #     for j in range(self.clusterMask.shape[1]):
+        #         if not np.all(self.clusterMask[i][j] == 0):
+        #             print self.clusterMask[i][j]
         self.clusterActivate()
-        for i in range(self.outputMask.shape[2]):
-            self.outputMask[:, :, i] = pred
         self.confirmEdit()
 
     def findLabel(self, x, y):
@@ -1428,15 +1532,13 @@ class MainWindow(QMainWindow):
         self.segMask = mask.reshape(self.segMask.shape[0], self.segMask.shape[1])
         return sorted_labels[0]
 
-    def avgToSemgentHelper(self, rec=1, label=1, x=0, y=0, r=False):
+    def avgToSemgentHelper(self):
         for y in range(0, self.segMaskAvg.shape[1]):
             for x in range(0, self.segMaskAvg.shape[0]):
                 if x == 0 and y == 0:
                     self.segMask[x][y] = 1
                     continue
-                # next_x = x + 1
-                # next_y = y
-                if (not x == self.segMaskAvg.shape[0] - 1): # and np.all(self.segMaskAvg[x][y] == self.segMaskAvg[next_x][next_y]):
+                if not x == self.segMaskAvg.shape[0] - 1:
                     self.segMask[x][y] = self.findLabel(x, y)
 
     def avgToSegments(self, avg):
@@ -1445,19 +1547,9 @@ class MainWindow(QMainWindow):
         self.segMask = np.zeros((avg.shape[0], avg.shape[1]))
         self.avgNextLabel = 2
         self.segMaskAvg = avg.copy()
-        self.avgToSemgentHelper(1)
+        self.avgToSemgentHelper()
         self.updateStatus("avgToSegments complete")
         return self.segMask
-
-        segements = np.zeros((avg.shape[0] * avg.shape[1]))
-
-        for j in range(len(avg_3)):
-            cluster = avg_3[j]
-            indices = np.where(np.all(avg_2 == cluster, axis=1))
-            for index in indices:
-                segements[index] = j
-        segements_2 = segements.reshape(avg.shape[0], avg.shape[1])
-        return segements_2
 
     def labelClusterAdd(self):
         """Set mouse action when adding to superpixel segments"""
@@ -1979,6 +2071,27 @@ class MainWindow(QMainWindow):
                           4. Confirm, unlabel or perform flood-fill.\n
                           5. Save image when finish annotating.
                           <p>For details, please check user manual in docs folder.""")
+
+    @staticmethod
+    def normalise(norm_input, max_num=1):
+        # with warnings.catch_warnings():
+        #    warnings.simplefilter("ignore")
+        norm_input = norm_input.astype(float)
+        min_ = abs(np.min(norm_input))
+        max_ = abs(np.max(norm_input))
+        i_max = min_ if min_ > max_ else max_
+        norm_input *= (max_num / i_max)
+        return norm_input
+
+    @staticmethod
+    def append_to_csv(csv_output_path, data, multiple_instances=False):
+        with open(csv_output_path, 'ab') as csv_file:
+            wr = csv.writer(csv_file)
+            if multiple_instances:
+                for i in range(len(data)):
+                    wr.writerow(data[i])
+            else:
+                wr.writerow(data)
 
 
 def main():
