@@ -1578,7 +1578,8 @@ class MainWindow(QMainWindow):
             self.imageLabel.mouseReleaseEvent = self.stopClusterAdd
 
     def addCluster(self):
-        print self.clusterPosition.x(),self.clusterPosition.y()
+        label, x, y = self.getLabel(self.clusterPosition)
+        # print self.clusterPosition.x(), self.clusterPosition.y()
         for i in range(len(self.cluster_queue)):
             if self.cluster_queue[i] == label:
                 return
