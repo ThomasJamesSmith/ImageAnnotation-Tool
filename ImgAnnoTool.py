@@ -139,6 +139,7 @@ class MainWindow(QMainWindow):
         self.cluster_queue = []
 
         self.currentColor = config.DEFAULT_FILLING_COLOR
+        self.currentLabelColor = None
         self.backgroundColor = config.DEFAULT_BACKGROUND_COLOR
         self.colorLabelDict = {}
         self.origin = QPoint()
@@ -333,11 +334,25 @@ class MainWindow(QMainWindow):
         self.labelAction = self.createAction("&Open\nLabels", self.editLabelFile, "Alt+f", "labels",
                                              "Open label file, create if doesn't exist")
         labelGroup.addAction(self.labelAction)
+        self.labelAction.setEnabled(False)
 
-        self.labelAddAction = self.createAction("&Add \nSuperpixel", self.labelToFileAdd, "Ctrl+{",
+        self.labelAddAction = self.createAction("&Add New \nSemantic Label", self.labelToFileAdd, "Ctrl+{",
                                              "SPadd", "Add new semantic label to labels file", True)
         labelGroup.addAction(self.labelAddAction)
         self.labelAddAction.setEnabled(False)
+
+        self.labelPaletteAction = self.createAction("&Choose Label\nColour", self.chooseLabelColor, "Ctrl+L",
+                                                    None, "Choose the color to label items")
+        labelGroup.addAction(self.labelPaletteAction)
+        self.labelPaletteAction.setEnabled(False)
+
+        ################################################################################################################
+        #   self.labelTextBox = QTextEdit(self)
+        #   self.labelTextBox.resize(150, 50)
+        ################################################################################################################
+
+
+
         
         helpAboutAction = self.createAction("&About...", self.helpAbout, None, "helpabout")
         helpHelpAction = self.createAction("&Help...", self.helpHelp, None, "help")
@@ -390,39 +405,6 @@ class MainWindow(QMainWindow):
                      SIGNAL("valueChanged(int)"), self.updateSPNum)
         self.spNum = self.spSpinBox.value()
 
-        # Label spin boxes
-        self.labelRedSpinBox = QSpinBox()
-        self.labelRedSpinBox.setRange(0, 255)
-        self.labelRedSpinBox.setValue(0)
-        self.labelRedSpinBox.setToolTip("Set red value for label")
-        self.labelRedSpinBox.setStatusTip(self.labelRedSpinBox.toolTip())
-        self.labelRedSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self.connect(self.labelRedSpinBox, SIGNAL("valueChanged(int)"), self.updateLabelNums)
-        self.labelRedNum = self.labelRedSpinBox.value()
-        self.labelRedSpinBox.setEnabled(False)
-
-        self.labelGreenSpinBox = QSpinBox()
-        self.labelGreenSpinBox.setRange(0, 255)
-        self.labelGreenSpinBox.setValue(0)
-        self.labelGreenSpinBox.setToolTip("Set green value for label")
-        self.labelGreenSpinBox.setStatusTip(self.labelGreenSpinBox.toolTip())
-        self.labelGreenSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self.connect(self.labelGreenSpinBox, SIGNAL("valueChanged(int)"), self.updateLabelNums)
-        self.labelGreenNum = self.labelGreenSpinBox.value()
-        self.labelGreenSpinBox.setEnabled(False)
-
-        self.labelBlueSpinBox = QSpinBox()
-        self.labelBlueSpinBox.setRange(0, 255)
-        self.labelBlueSpinBox.setValue(0)
-        self.labelBlueSpinBox.setToolTip("Set blue value for label")
-        self.labelBlueSpinBox.setStatusTip(self.labelBlueSpinBox.toolTip())
-        self.labelBlueSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self.connect(self.labelBlueSpinBox, SIGNAL("valueChanged(int)"), self.updateLabelNums)
-        self.labelBlueNum = self.labelBlueSpinBox.value()
-        self.labelBlueSpinBox.setEnabled(False)
-        self.labelName = "New Name"
-
-
         # Create color dialog
         self.colorDialog = ColorDialog(parent=self)
 
@@ -455,27 +437,25 @@ class MainWindow(QMainWindow):
         self.toolBar.setObjectName("ToolBar")
         self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, self.undoAction,
                                  quitAction, None, zoomInAction)
-        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, self.hideMaskAction, None,
-                                 self.paletteAction, self.confirmAction, self.deleteAction,
+        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, self.hideMaskAction, None)
+        self.toolBarActions_3 = (self.paletteAction, self.confirmAction, self.deleteAction,
                                  self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
                                  self.ellipseLabelAction, self.polygonLabelAction,None)
-        self.toolBarActions_3 = (self.spAction, self.hidespAction, self.spMouseAction,
+        self.toolBarActions_4 = (self.spAction, self.hidespAction, self.spMouseAction,
                                  self.spAddAction, self.spSubAction, None)
 
-        self.toolBarActions_4 = (self.clusterAction, self.hideClusterAction, self.showSuggestedClusterAction,
+        self.toolBarActions_5 = (self.clusterAction, self.hideClusterAction, self.showSuggestedClusterAction,
                                  self.clusterMouseAction, self.clusterAddAction, self.clusterSubAction, None)
-        self.toolBarActions_5 = (self.labelAction, self.labelAddAction, None)
+        self.toolBarActions_6 = (self.labelAction, self.labelAddAction, self.labelPaletteAction, None)
 
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_2)
-        self.toolBar.addWidget(self.spSpinBox)
+        self.addActions(self.toolBar, self.toolBarActions_6)
         self.addActions(self.toolBar, self.toolBarActions_3)
+        self.toolBar.addWidget(self.spSpinBox)
         self.addActions(self.toolBar, self.toolBarActions_4)
         self.addActions(self.toolBar, self.toolBarActions_5)
-        self.toolBar.addWidget(self.labelRedSpinBox)
-        self.toolBar.addWidget(self.labelGreenSpinBox)
-        self.toolBar.addWidget(self.labelBlueSpinBox)
 
         self.colorLabelBar = QToolBar("Labels and colors")
         self.addToolBar(Qt.LeftToolBarArea, self.colorLabelBar)
@@ -518,6 +498,10 @@ class MainWindow(QMainWindow):
         self.workerVideo.signals.progress.connect(self.loadedVideo)
         self.threadpool.start(self.workerVideo)
 
+    def labelDialog(self):
+        text, result = QInputDialog.getText(self, 'Sematic label Name', 'Enter label name: ')
+        if result == True:
+            return str(text)
         
 ###############################################################################
 ###############################################################################
@@ -586,28 +570,28 @@ class MainWindow(QMainWindow):
         self.fileMenu.addSeparator()
         self.fileMenu.addAction(self.fileMenuActions[-1])
 
-    def updateToolBar(self):
+    def updateToolBar(self, updated=False):
         """Update toolbar to show color labels"""
         if self.filename == None:
             return
-        if self.colourLabels is None:
+        if self.colourLabels is None or updated:
             self.colourLabels = config.getLabelColor(self.filename)
 
         if self.colourLabels is None:
             self.colorLabelBar.hide()
+            self.labelAction.setEnabled(True)
         else:
+            self.labelAction.setEnabled(False)
             self.labelAddAction.setEnabled(True)
-            self.labelRedSpinBox.setEnabled(True)
-            self.labelGreenSpinBox.setEnabled(True)
-            self.labelBlueSpinBox.setEnabled(True)
+            self.labelPaletteAction.setEnabled(True)
             self.colorLabelBar.clear()
             self.colorLabelBar.show()
             self.labelsGroup = QActionGroup(self)
-            self.colorLabelDict= {}
+            self.colorLabelDict = {}
             for label in self.colourLabels.keys():
                 action = self.createAction(label, self.chooseColor_2, None,
-                                                       None, "Color the label with user specified color",
-                                                       True, "toggled(bool)")
+                                           None, "Color the label with user specified color",
+                                           True, "toggled(bool)")
                 icon = QPixmap(50, 50)
                 icon.fill(self.colourLabels[label])
                 action.setIcon(QIcon(icon))
@@ -1163,11 +1147,6 @@ class MainWindow(QMainWindow):
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
 
-    def updateLabelNums(self):
-        self.labelRedNum = self.labelRedSpinBox.value()
-        self.labelGreenNum = self.labelGreenSpinBox.value()
-        self.labelBlueNum = self.labelBlueSpinBox.value()
-
     def updateSPNum(self):
         self.spNum = self.spSpinBox.value()
         self.spAction.setEnabled(True)
@@ -1395,11 +1374,45 @@ class MainWindow(QMainWindow):
     def finishMove(self, event):
         pass
 
+    def labelColourExists(self):
+        for label in self.colourLabels.keys():
+
+            if self.colourLabels[label] == QColor(self.currentLabelColor.red(),
+                                                     self.currentLabelColor.green(),
+                                                     self.currentLabelColor.blue()):
+                self.updateStatus("Please choose another colour\nas this on is already in use")
+                return True
+        return False
+
+    def labelNameExists(self):
+        for label in self.colourLabels.keys():
+
+            if label == self.labelName:
+                self.updateStatus("Please choose another name\nas this on is already in use")
+                return True
+        return False
+
     def labelToFileAdd(self):
-        imgRoot = os.path.dirname(self.filename)
-        path = os.path.join(imgRoot, "label.txt")
-        self.append_to_csv(path, [self.labelRedNum, self.labelGreenNum, self.labelBlueNum, self.labelName])
-        self.updateToolBar()
+        if self.currentLabelColor is None:
+            self.updateStatus("Please select a label colour.")
+            return
+
+        if self.labelColourExists():
+
+            return
+
+        run = True
+        while run:
+            self.labelName = self.labelDialog()
+            run = self.labelNameExists()
+        if not self.labelName is None and len(self.labelName) > 0:
+            imgRoot = os.path.dirname(self.filename)
+            path = os.path.join(imgRoot, "label.txt")
+            self.append_to_csv(path, [self.currentLabelColor.red(),
+                                      self.currentLabelColor.green(),
+                                      self.currentLabelColor.blue(),
+                                      self.labelName])
+            self.updateToolBar(updated=True)
 
     def editLabelFile(self):
         self.colourLabels = config.getLabelColor(self.filename)
@@ -1944,6 +1957,18 @@ class MainWindow(QMainWindow):
     def mouseReleaseFF(self, event):
         pass
 
+    def chooseLabelColor(self):
+        """Use a palette to choose labelling color"""
+        color = self.colorDialog.getColor(self.currentLabelColor,
+                                "Choose labelling color", config.DEFAULT_FILLING_COLOR)
+        if color:
+            self.currentLabelColor = color
+            self.updateStatus("Choose a new color")
+            icon = QPixmap(50, 50)
+            icon.fill(self.currentLabelColor)
+            self.labelPaletteAction.setIcon(QIcon(icon))
+
+
     def chooseColor(self):
         """Use a palette to choose labelling color"""
         color = self.colorDialog.getColor(self.currentColor,
@@ -1954,9 +1979,9 @@ class MainWindow(QMainWindow):
             icon = QPixmap(50, 50)
             icon.fill(self.currentColor)
             self.paletteAction.setIcon(QIcon(icon))
-            if not self.colorLabelBar.isHidden() and \
-                            self.labelsGroup.checkedAction() is not None:
-                self.labelsGroup.checkedAction().setChecked(False)
+            # if not self.colorLabelBar.isHidden() and \
+            #                 self.labelsGroup.checkedAction() is not None:
+            #     self.labelsGroup.checkedAction().setChecked(False)
             if self.floodFillAction.isChecked():
                 self.showImage()
 
