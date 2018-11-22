@@ -3,6 +3,7 @@ from skimage.segmentation import slic
 from skimage.segmentation import mark_boundaries
 from skimage.util import img_as_float
 from skimage import io
+from skimage.color import label2rgb
 import matplotlib.pyplot as plt
 import argparse
 import time
@@ -30,7 +31,9 @@ print("%d segments %d seconds" % (numSegments, finish_time - start_time))
 fig = plt.figure("Superpixels -- %d segments" % (numSegments))
 ax = fig.add_subplot(1, 1, 1)
 mask = mark_boundaries(image, segments)
+avg = label2rgb(segments, image, kind='avg')
 io.imsave("test_sp_mask.jpg", mask)
+io.imsave("test_sp_avg.jpg", avg)
 ax.imshow(mask)
 #cv2.imwrite("test_sp_mask.jpg", mask)
 plt.axis("off")

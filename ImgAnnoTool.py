@@ -113,6 +113,7 @@ class MainWindow(QMainWindow):
         self.hideSP = False
         self.hideCluster = False
         self.showSuggestedCluster = False
+        self.showClusterOutlines = False
         self.hideMask = False
         self.isLaballing = False
         self.finishChoosingArea = False
@@ -323,12 +324,17 @@ class MainWindow(QMainWindow):
         self.showSuggestedClusterAction = self.createAction("&Show\nSuggested\nCluster", self.hideButtonClick, "Alt+H",
                                                             "hide", "Show suggested cluster overlay", True, "toggled(bool)")
 
+        self.showClusterOutlinesAction = self.createAction("&Show\nCluster\nOutline", self.hideButtonClick, "Alt+H",
+                                                            "hide", "Show cluster outline overlay", True,
+                                                            "toggled(bool)")
+
         self.clusterMouseAction.setChecked(True)
         self.clusterMouseAction.setEnabled(False)
         self.clusterAddAction.setEnabled(False)
         self.clusterSubAction.setEnabled(False)
         self.hideClusterAction.setEnabled(False)
         self.showSuggestedClusterAction.setEnabled(False)
+        self.showClusterOutlinesAction.setEnabled(False)
 
         labelGroup = QActionGroup(self)
         self.labelAction = self.createAction("&Open\nLabels", self.editLabelFile, "Alt+f", "labels",
@@ -445,7 +451,8 @@ class MainWindow(QMainWindow):
                                  self.spAddAction, self.spSubAction, None)
 
         self.toolBarActions_5 = (self.clusterAction, self.hideClusterAction, self.showSuggestedClusterAction,
-                                 self.clusterMouseAction, self.clusterAddAction, self.clusterSubAction, None)
+                                 self.showClusterOutlinesAction, self.clusterMouseAction, self.clusterAddAction,
+                                 self.clusterSubAction, None)
         self.toolBarActions_6 = (self.labelAction, self.labelAddAction, self.labelPaletteAction, None)
 
         self.addActions(self.toolBar, self.toolBarActions_1)
@@ -1063,6 +1070,9 @@ class MainWindow(QMainWindow):
         """Apply mask to origin image and get the displayable image"""
         dst = self.cvimage
         inverted = False
+
+        if self.hideImg:
+            return self.outputMask
         
         gray_output = cv2.cvtColor(self.outputMask, cv2.COLOR_RGB2GRAY)
         ret, mask_output = cv2.threshold(gray_output, 2, 255, cv2.THRESH_BINARY)
@@ -1089,7 +1099,6 @@ class MainWindow(QMainWindow):
             inverted = True
             # print np.ndarray.min(self.clusterMask)
             # print np.ndarray.max(self.clusterMask)
-            print self.clusterMask.shape
             alpha = 0.5
             # alpha_channel = np.full((self.clusterMask.shape[0], self.clusterMask.shape[1], 1), alpha)
             # alpha_cluster = np.dstack((self.clusterMask, alpha_channel))
@@ -1100,10 +1109,16 @@ class MainWindow(QMainWindow):
             alpha = 0.5
             # alpha_channel = np.full((self.suggestedClusterMask.shape[0], self.suggestedClusterMask.shape[1], 1), alpha)
             # alpha_cluster = np.dstack((self.suggestedClusterMask, alpha_channel))
-            print self.clusterMask.shape
             output = dst.copy()
             cv2.addWeighted(self.suggestedClusterMask, alpha, output, 1 - alpha, 0, output)
             dst = output
+
+        if self.suggestedClusterMask is not None and self.showClusterOutlines:
+            self.updateStatus("showSuggestedCluster")
+            output = dst.copy()
+            dst = mark_boundaries(output, clusterMask, (1, 0, 0))
+
+            # toggle between all 3 states
 
 
         if self.choosingPointFF:
@@ -1129,10 +1144,7 @@ class MainWindow(QMainWindow):
             singlecolor = np.zeros((height, width, 3), np.uint8) # Create a single color image to specify the FF area
             singlecolor[:, :] = [self.currentColor.red(), self.currentColor.green(), self.currentColor.blue()]
             area_FloodFill = cv2.bitwise_and(singlecolor, singlecolor, mask=mask)
-            if self.hideImg:
-                output_origin = cv2.bitwise_and(self.outputMask, self.outputMask, mask=mask_inv)
-                dst = cv2.add(output_origin, area_FloodFill)
-            else:
+            if not self.hideImg:
                 change_origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask=mask_inv)
                 dst = cv2.add(change_origin, area_FloodFill)
 
@@ -1214,6 +1226,8 @@ class MainWindow(QMainWindow):
 
         if self.hideClusterAction.isChecked():
             self.hideCluster = True
+            self.showSuggestedClusterAction.setChecked(False)
+            self.showClusterOutlinesAction.setChecked(False)
         else:
             self.hideCluster = False
 
@@ -1222,6 +1236,10 @@ class MainWindow(QMainWindow):
         else:
             self.showSuggestedCluster = False
 
+        if self.showClusterOutlinesAction.isChecked():
+            self.showClusterOutlines = True
+        else:
+            self.showClusterOutlines = False
             
         if self.hideMaskAction.isChecked():
             self.hideMask = True
@@ -1415,6 +1433,7 @@ class MainWindow(QMainWindow):
             self.updateToolBar(updated=True)
 
     def editLabelFile(self):
+        self.updateStatus(self.filename)
         self.colourLabels = config.getLabelColor(self.filename)
         if self.colourLabels is None:
             imgRoot = os.path.dirname(self.filename)
@@ -1423,7 +1442,6 @@ class MainWindow(QMainWindow):
 
         self.updateToolBar()
 
-
     def clusterActivate(self):
         self.clusterActive = True
         self.clusterMouseAction.setEnabled(True)
@@ -1431,6 +1449,7 @@ class MainWindow(QMainWindow):
         self.clusterAddAction.setEnabled(True)
         self.hideClusterAction.setEnabled(True)
         self.showSuggestedClusterAction.setEnabled(True)
+        self.showClusterOutlinesAction.setEnabled(True)
         self.clusterAction.setEnabled(False)
         self.clusterAddAction.setChecked(True)
 
@@ -1441,6 +1460,7 @@ class MainWindow(QMainWindow):
         self.clusterSubAction.setEnabled(False)
         self.hideClusterAction.setEnabled(False)
         self.showSuggestedClusterAction.setEnabled(False)
+        self.showClusterOutlinesAction.setEnabled(False)
         self.clusterAction.setEnabled(True)
         self.clusterMouseAction.setChecked(True)
 
@@ -1968,7 +1988,6 @@ class MainWindow(QMainWindow):
             icon = QPixmap(50, 50)
             icon.fill(self.currentLabelColor)
             self.labelPaletteAction.setIcon(QIcon(icon))
-
 
     def chooseColor(self):
         """Use a palette to choose labelling color"""
