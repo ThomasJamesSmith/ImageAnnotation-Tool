@@ -1018,6 +1018,7 @@ class MainWindow(QMainWindow):
             if self.cvimage is None:
                 message = "Failed to read %s" % fname
             else:
+                self.clusterDeactivate()
                 # Create output image directory if not existing
                 if not os.path.exists(config.outputDir(fname)):
                     os.makedirs(config.outputDir(fname))
@@ -1533,6 +1534,12 @@ class MainWindow(QMainWindow):
         self.showClusterOutlinesAction.setEnabled(False)
         self.clusterAction.setEnabled(True)
         self.clusterMouseAction.setChecked(True)
+        self.clusterMask = None
+        self.suggestedClusterMask = None
+        self.showSuggestedCluster = False
+        self.showClusterOutlines = False
+        self.hideCluster = False
+        self.regionSegments = None
 
     def openClusters(self):
         if self.filename is None:
@@ -2233,6 +2240,8 @@ class MainWindow(QMainWindow):
         min_ = abs(np.min(norm_input))
         max_ = abs(np.max(norm_input))
         i_max = min_ if min_ > max_ else max_
+        if i_max == 0:
+            return 0
         norm_input *= (max_num / i_max)
         return norm_input
 
