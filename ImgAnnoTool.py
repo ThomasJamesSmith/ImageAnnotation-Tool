@@ -102,6 +102,7 @@ class MainWindow(QMainWindow):
         self.ioimage = None         # Original image
         self.outputMask = None      # Output image
         self.displayImage = None
+        self.regionSegments = None
 
         self.allImages = []
         self.finished = False   # Indicate whether the image annotation is finished
@@ -125,6 +126,7 @@ class MainWindow(QMainWindow):
         self.suggestedClusterMask = None
         self.q = Queue(maxsize=0)
         self.q_Video = Queue(maxsize=0)
+        self.q_Cluster = Queue(maxsize=1)
         self.num_threads = 7
         self.firstDone = False
         self.spMassActive = False
@@ -279,6 +281,11 @@ class MainWindow(QMainWindow):
                                                  "flood-fill", "Apply flood-fill to selected area", True,
                                                  "toggled(bool)")
         self.floodFillAction.setEnabled(False)
+
+        self.clearAction = self.createAction("&Clear...", self.clearLabel, "Del",
+                                              "delete", "Clear all.")
+        self.clearAction.setEnabled(True)
+
         
         self.spAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel",
                                           "Run superpixel Algorithm")
@@ -310,7 +317,7 @@ class MainWindow(QMainWindow):
 
         # Create group of actions for cluster
         clusterGroup = QActionGroup(self)
-        self.clusterAction = self.createAction("&Cluster", self.openClusters, "Alt+s", "cluster",
+        self.clusterAction = self.createAction("&Cluster", self.runClusterAlg, "Alt+s", "cluster",
                                                "add cluster overlay")
         self.clusterMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+c",
                                                     "cursor", "No Action", True, "toggled(bool)")
@@ -410,7 +417,7 @@ class MainWindow(QMainWindow):
         self.lastSpinboxValue = self.zoomSpinBox.value()
 
         self.spSpinBox = QSpinBox()
-        self.spSpinBox.setRange(100, 1000)
+        self.spSpinBox.setRange(100, 2000)
         self.spSpinBox.setValue(550)
         self.spSpinBox.setToolTip("Set number of Superpixels")
         self.spSpinBox.setStatusTip(self.spSpinBox.toolTip())
@@ -450,17 +457,29 @@ class MainWindow(QMainWindow):
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self.toolBar.setObjectName("ToolBar")
         self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, self.undoAction,
-                                 quitAction, None, zoomInAction)
-        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, self.hideMaskAction, None)
+                                 quitAction, self.clearAction, None, zoomInAction)
+        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, self.hideMaskAction,
+                                 self.hidespAction, self.hideClusterAction, self.showSuggestedClusterAction,
+                                 self.showClusterOutlinesAction, self.clusterPaletteAction,
+                                 None)
+
         self.toolBarActions_3 = (self.paletteAction, self.confirmAction, self.deleteAction,
                                  self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
-                                 self.ellipseLabelAction, self.polygonLabelAction,None)
-        self.toolBarActions_4 = (self.spAction, self.hidespAction, self.spMouseAction,
-                                 self.spAddAction, self.spSubAction, None)
 
-        self.toolBarActions_5 = (self.clusterAction, self.hideClusterAction, self.showSuggestedClusterAction,
-                                 self.showClusterOutlinesAction, self.clusterPaletteAction, self.clusterMouseAction,
+                                 self.ellipseLabelAction, self.polygonLabelAction,None)
+
+        # self.toolBarActions_4 = (self.spAction, self.hidespAction, self.spMouseAction,
+        #                          self.spAddAction, self.spSubAction, None)
+
+        self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, self.spSubAction, None)
+
+        # self.toolBarActions_5 = (self.clusterAction, self.hideClusterAction, self.showSuggestedClusterAction,
+        #                          self.showClusterOutlinesAction, self.clusterPaletteAction, self.clusterMouseAction,
+        #                          self.clusterAddAction, self.clusterSubAction, None)
+
+        self.toolBarActions_5 = (self.clusterAction, self.clusterMouseAction,
                                  self.clusterAddAction, self.clusterSubAction, None)
+
         self.toolBarActions_6 = (self.labelAction, self.labelAddAction, self.labelPaletteAction, None)
 
         self.addActions(self.toolBar, self.toolBarActions_1)
@@ -485,14 +504,14 @@ class MainWindow(QMainWindow):
         settings = QSettings()
         self.recentFiles = settings.value("RecentFiles").toStringList()
         size = settings.value("MainWindow/Size",
-                        QVariant(QSize(800, 600))).toSize()
+                              QVariant(QSize(800, 600))).toSize()
         self.resize(size)
         # Put in the middle of screen by default
         screen = QDesktopWidget().screenGeometry()
         size = self.geometry()
         position = settings.value("MainWindow/Position",
-                        QVariant(QPoint((screen.width() - size.width()) / 2,
-                        (screen.height() - size.height()) / 2))).toPoint()
+                                  QVariant(QPoint((screen.width() - size.width()) / 2,
+                                                  (screen.height() - size.height()) / 2))).toPoint()
         self.move(position)
         self.restoreState(
             settings.value("MainWindow/State").toByteArray())
@@ -506,21 +525,23 @@ class MainWindow(QMainWindow):
         for i in range(self.num_threads-2):
             worker = Worker(self.runMassSuperpixelQueue, self.q)
             worker.signals.progress.connect(self.loadFirstSPImage)
-
             self.threadpool.start(worker)
         
         self.workerVideo = Worker(self.runVideoQueue, self.q_Video)
         self.workerVideo.signals.progress.connect(self.loadedVideo)
         self.threadpool.start(self.workerVideo)
 
+        self.workerCluster = Worker(self.runClusterQueue, self.q_Cluster)
+        self.workerCluster.signals.progress.connect(self.loadedCluster)
+        self.threadpool.start(self.workerCluster)
+
+###############################################################################
+###############################################################################
+
     def labelDialog(self):
         text, result = QInputDialog.getText(self, 'Sematic label Name', 'Enter label name: ')
         if result == True:
             return str(text)
-        
-###############################################################################
-###############################################################################
-
 
     def setDirty(self):
         """Call this method when applying changes"""
@@ -906,7 +927,18 @@ class MainWindow(QMainWindow):
         
         if dirname and not loadingMultiVideos:
             self.dirOpen(True, dirname, applySP)
-    
+
+    def runClusterAlg(self):
+        if self.q_Cluster.qsize() == 0:
+            self.q_Cluster.put([0])
+
+    def runClusterQueue(self, q, progress_callback):
+        while True:
+            arg = q.get()
+            self.openClusters()
+            q.task_done()
+            progress_callback.emit("")
+
     def runVideoQueue(self, q, progress_callback):
         while True:
             arg = q.get()
@@ -952,14 +984,16 @@ class MainWindow(QMainWindow):
                 break
             name += 1
 
+    def loadedCluster(self):
+        self.updateStatus("Cluster Loaded")
+
     def loadedVideo(self, dir):
         self.mutex.lock()
         self.videoComplete += 1
         self.updateStatus("Video progress: %d/%d" %(self.videoComplete, self.videoTotal))
         self.mutex.unlock()
         self.dirOpen(True, dir, self.loadMultiVideoAns[2])
-        
-        
+
         if self.videoComplete == self.videoTotal:
             self.loadingVideoActive = False
             self.videoComplete = 0
@@ -981,7 +1015,6 @@ class MainWindow(QMainWindow):
         if fname:
             # Read in as opencv image and then convert to QImage
             self.cvimage = cv2.imread(fname.decode('utf-8').encode('gbk'))
-            self.ioimage = io.imread(fname)
             if self.cvimage is None:
                 message = "Failed to read %s" % fname
             else:
@@ -1004,14 +1037,13 @@ class MainWindow(QMainWindow):
                 dirSplit = dir.split('.')
                 if os.path.exists(dirSplit[0] + ".csv"):
                     self.spSegments = np.int64(np.genfromtxt(dirSplit[0] + ".csv", delimiter=','))
-                    self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8), self.spSegments, color=(1, 0, 0)))*255
-
+                    self.spMask = np.uint8(mark_boundaries(np.zeros(self.cvimage.shape, np.uint8),
+                                                           self.spSegments, color=(1, 0, 0)))*255
                     self.spActivate()
                 else:
                     self.spDeactivate()
                     self.spSegments = None
                     self.spMask = None
-                self.regionSegments = None
 
                 self.addRecentFile(self.filename)
                 self.sizeLabel.setText("Image size: %d x %d" %
@@ -1092,7 +1124,7 @@ class MainWindow(QMainWindow):
         ret, mask_output = cv2.threshold(gray_output, 2, 255, cv2.THRESH_BINARY)
         masked_output = cv2.bitwise_and(self.outputMask, self.outputMask, mask=mask_output)
         
-        if (masked_output!=0).any() and not self.hideMask:
+        if (masked_output != 0).any() and not self.hideMask:
             inverted = True
             masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask=mask_output)
             temp = cv2.addWeighted(masked_output, 0.6, masked_image_output, 0.4, 0)
@@ -1100,13 +1132,22 @@ class MainWindow(QMainWindow):
             dst = cv2.add(temp, origin)
             
         if self.spMask is not None and not self.hideSP:  # and show sp
-            inverted = True
-            gray_sp = cv2.cvtColor(self.spMask, cv2.COLOR_RGB2GRAY)
-            ret, mask_sp = cv2.threshold(gray_sp, 2, 255, cv2.THRESH_BINARY)
-            mask_sp_inverted = cv2.bitwise_not(mask_sp)
-            masked_sp = cv2.bitwise_and(self.spMask, self.spMask, mask = mask_sp)
-            masked_out_sp = cv2.bitwise_and(dst, dst, mask = mask_sp_inverted)
-            dst = cv2.add(masked_sp, masked_out_sp)
+            # inverted = True
+            # io.imsave("self.spMask.png",self.spMask)
+            # gray_sp = cv2.cvtColor(self.spMask, cv2.COLOR_RGB2GRAY)
+            # ret, mask_sp = cv2.threshold(gray_sp, 2, 255, cv2.THRESH_BINARY)
+            # mask_sp_inverted = cv2.bitwise_not(mask_sp)
+            # masked_sp = cv2.bitwise_and(self.spMask, self.spMask, mask=mask_sp)
+            # masked_out_sp = cv2.bitwise_and(dst, dst, mask=mask_sp_inverted)
+            # dst = cv2.add(masked_sp, masked_out_sp)
+            output = dst.copy()
+            colour = [float(self.currentOutlineColor.red()) / 255.0,
+                      float(self.currentOutlineColor.green()) / 255.0,
+                      float(self.currentOutlineColor.blue()) / 255.0]
+            boundaries = mark_boundaries(output, self.spSegments, colour)
+            boundaries_2 = boundaries * 255
+            boundaries_3 = boundaries_2.astype(np.uint8)
+            dst = boundaries_3
 
         if self.regionSegments is not None and not self.hideCluster and not self.showSuggestedCluster:
             # change to overlay
@@ -1135,9 +1176,6 @@ class MainWindow(QMainWindow):
             # io.imsave("regionSegments.png", self.regionSegments)
             # dst = mark_boundaries(self.regionSegments, self.ioimage)
             # dst = self.regionSegments
-
-
-
 
         if self.choosingPointFF:
             factor = self.chooseFFPointSpinBoxValue * 1.0 / 100
@@ -1215,16 +1253,21 @@ class MainWindow(QMainWindow):
             os.makedirs(config.outputDir(dir))
             
         output = np.zeros(img.shape, np.uint8)
-        segments = slic(img, n_segments = self.spNum, sigma=1, compactness=30)
+        segments = slic(img, n_segments=self.spNum, sigma=1, compactness=30)
         path = config.outputFile(dir)
         pathSplit = path.split('.')
         np.savetxt(pathSplit[0] + ".csv", segments, delimiter=",", fmt="%d")        
         output = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(config.outputFile(dir).decode('utf-8').encode('gbk'), output)
+        # cv2.imwrite(config.outputFile(dir).decode('utf-8').encode('gbk'), output)
 
     def runSuperpixelAlg(self):
+        if self.dirty:
+            if not self.okToContinue():
+                self.updateStatus("Superpixels canceled")
+                return
+
         self.firstDone = False
-        self.q.put([self.filename,0])
+        self.q.put([self.filename, 0])
         self.spMassTotal = len(self.allImages)
         self.spMassComplete = 0
         self.spMassActive = True
@@ -1318,6 +1361,7 @@ class MainWindow(QMainWindow):
         self.hidespAction.setEnabled(True)
         self.spAction.setEnabled(False)
         self.spAddAction.setChecked(True)
+        self.clusterPaletteAction.setEnabled(True)
 
     def spDeactivate(self):
         self.spActive = False
@@ -1327,6 +1371,7 @@ class MainWindow(QMainWindow):
         self.hidespAction.setEnabled(False)
         self.spAction.setEnabled(True)
         self.spMouseAction.setChecked(True)
+        self.clusterPaletteAction.setEnabled(False)
 
     def finishAreaChoosing(self):
         """Finish choosing the area, and then enable three editing choices"""
@@ -1455,15 +1500,15 @@ class MainWindow(QMainWindow):
                                       self.currentLabelColor.blue(),
                                       self.labelName])
             self.updateToolBar(updated=True)
+        return
 
     def openLabels(self):
-        self.updateStatus(self.filename)
+        updateStatus(self.filename)
         self.colourLabels = config.getLabelColor(self.filename)
         if self.colourLabels is None:
             imgRoot = os.path.dirname(self.filename)
             path = os.path.join(imgRoot, "label.txt")
             self.append_to_csv(path, [0, 0, 0, "unknown"])
-
         self.updateToolBar()
 
     def clusterActivate(self):
@@ -1490,7 +1535,9 @@ class MainWindow(QMainWindow):
         self.clusterMouseAction.setChecked(True)
 
     def openClusters(self):
-        self.updateStatus("Open Cluster")
+        if self.filename is None:
+            return
+        self.updateStatus("Opening Cluster")
         split_file_dir = self.filename.split('.')
         avg_path = split_file_dir[0] + "_avg." + split_file_dir[1]
         pred_path = split_file_dir[0] + "_prediction." + split_file_dir[1]
@@ -1607,7 +1654,6 @@ class MainWindow(QMainWindow):
         self.avgNextLabel = 2
         self.segMaskAvg = avg.copy()
         self.avgToSemgentHelper()
-        self.updateStatus("avgToSegments complete")
         return self.segMask.astype(int)
 
     def labelClusterAdd(self):
@@ -1615,6 +1661,11 @@ class MainWindow(QMainWindow):
         if self.sender().isChecked():
             self.mouseAction.setChecked(True)
             self.setMouseAction()
+
+            if self.spAddAction.isEnabled():
+                self.spAddAction.setChecked(False)
+                self.spSubAction.setChecked(False)
+                self.spMouseAction.setChecked(True)
 
             self.isLaballing = False
             self.notFinishAreaChoosing()
@@ -1694,7 +1745,13 @@ class MainWindow(QMainWindow):
         if self.sender().isChecked():
             self.mouseAction.setChecked(True)
             self.setMouseAction()
-            
+
+            if self.clusterAddAction.isEnabled():
+                self.clusterAddAction.setChecked(False)
+                self.clusterSubAction.setChecked(False)
+                self.clusterMouseAction.setChecked(True)
+
+
             self.isLaballing = False
             self.notFinishAreaChoosing()
             self.showImage()
@@ -1876,6 +1933,20 @@ class MainWindow(QMainWindow):
         if not self.dirty:
             self.setDirty()
         self.undoAction.setEnabled(True)
+
+    def clearLabel(self):
+        if self.dirty:
+            if not self.okToContinue():
+                self.updateStatus("Clear canceled")
+                return
+        copy = self.outputMask.copy()
+        self.historyStack.append(copy)
+        self.outputMask = np.zeros(self.outputMask.shape, np.uint8)
+        if not self.dirty:
+            self.setDirty()
+        self.undoAction.setEnabled(True)
+        self.updateStatus("All annotation cleared.")
+        self.showImage()
 
     def deleteLabel(self):
         """Unlabel the chosen area"""
