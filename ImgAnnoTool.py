@@ -121,6 +121,8 @@ class MainWindow(QMainWindow):
         self.finishChoosingArea = False
         self.spActive = False
         self.spNum = 550
+        self.alphaMaskNum = 0.5
+        self.alphaClusterNum = 0.5
         self.spMask = None
         self.clusterMask = None
         self.suggestedClusterMask = None
@@ -426,6 +428,28 @@ class MainWindow(QMainWindow):
                      SIGNAL("valueChanged(int)"), self.updateSPNum)
         self.spNum = self.spSpinBox.value()
 
+        self.alphaMaskSpinBox = QDoubleSpinBox()
+        self.alphaMaskSpinBox.setRange(0, 1)
+        self.alphaMaskSpinBox.setValue(0.5)
+        self.alphaMaskSpinBox.setSingleStep(0.01)
+        self.alphaMaskSpinBox.setToolTip("Set alpha number for mask overlays")
+        self.alphaMaskSpinBox.setStatusTip(self.alphaMaskSpinBox.toolTip())
+        self.alphaMaskSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.alphaMaskSpinBox,
+                     SIGNAL("valueChanged(double)"), self.updateAlphaMaskNum)
+        self.alphaMaskNum = self.alphaMaskSpinBox.value()
+
+        self.alphaClusterSpinBox = QDoubleSpinBox()
+        self.alphaClusterSpinBox.setRange(0, 1)
+        self.alphaClusterSpinBox.setValue(0.5)
+        self.alphaClusterSpinBox.setSingleStep(0.01)
+        self.alphaClusterSpinBox.setToolTip("Set alpha number for cluster overlays")
+        self.alphaClusterSpinBox.setStatusTip(self.alphaClusterSpinBox.toolTip())
+        self.alphaClusterSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.alphaClusterSpinBox,
+                     SIGNAL("valueChanged(double)"), self.updateAlphaClusterNum)
+        self.alphaClusterNum = self.alphaClusterSpinBox.value()
+
         # Create color dialog
         self.colorDialog = ColorDialog(parent=self)
 
@@ -443,7 +467,7 @@ class MainWindow(QMainWindow):
                                    self.ellipseLabelAction, self.polygonLabelAction))
 
         viewMenu = self.menuBar().addMenu("&View")
-        self.addActions(viewMenu, (zoomInAction, zoomOutAction, self.hideOriginalAction,self.hideMaskAction,
+        self.addActions(viewMenu, (zoomInAction, zoomOutAction, self.hideOriginalAction, self.hideMaskAction,
                                    None, hideLogViewerAction, showLogViewerAction))
 
         helpMenu = self.menuBar().addMenu("&Help")
@@ -458,38 +482,27 @@ class MainWindow(QMainWindow):
         self.toolBar.setObjectName("ToolBar")
         self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, self.undoAction,
                                  quitAction, self.clearAction, None, zoomInAction)
-        self.toolBarActions_2 = (zoomOutAction, self.hideOriginalAction, self.hideMaskAction,
-                                 self.hidespAction, self.hideClusterAction, self.showSuggestedClusterAction,
-                                 self.showClusterOutlinesAction, self.clusterPaletteAction,
-                                 None)
-
-        self.toolBarActions_3 = (self.paletteAction, self.confirmAction, self.deleteAction,
-                                 self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
-
-                                 self.ellipseLabelAction, self.polygonLabelAction,None)
-
-        # self.toolBarActions_4 = (self.spAction, self.hidespAction, self.spMouseAction,
-        #                          self.spAddAction, self.spSubAction, None)
-
-        self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, self.spSubAction, None)
-
-        # self.toolBarActions_5 = (self.clusterAction, self.hideClusterAction, self.showSuggestedClusterAction,
-        #                          self.showClusterOutlinesAction, self.clusterPaletteAction, self.clusterMouseAction,
-        #                          self.clusterAddAction, self.clusterSubAction, None)
-
-        self.toolBarActions_5 = (self.clusterAction, self.clusterMouseAction,
-                                 self.clusterAddAction, self.clusterSubAction, None)
-
-        self.toolBarActions_6 = (self.labelAction, self.labelAddAction, self.labelPaletteAction, None)
-
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
+
+        self.toolBarActions_2 = (zoomOutAction, None, self.hideOriginalAction, self.hideMaskAction,
+                                 self.hidespAction, self.hideClusterAction, self.showSuggestedClusterAction,
+                                 self.showClusterOutlinesAction, self.clusterPaletteAction, None)
         self.addActions(self.toolBar, self.toolBarActions_2)
-        self.addActions(self.toolBar, self.toolBarActions_6)
+        self.toolBar.addWidget(self.alphaMaskSpinBox)
+        self.toolBar.addWidget(self.alphaClusterSpinBox)
+
+        self.toolBarActions_3 = (None, self.labelAction, self.labelAddAction, self.labelPaletteAction, None,
+                                 self.paletteAction, self.confirmAction, self.deleteAction,
+                                 self.floodFillAction, None, self.mouseAction, self.rectLabelAction,
+                                 self.ellipseLabelAction, self.polygonLabelAction, None)
         self.addActions(self.toolBar, self.toolBarActions_3)
         self.toolBar.addWidget(self.spSpinBox)
+
+        self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, self.spSubAction, None,
+                                 self.clusterAction, self.clusterMouseAction, self.clusterAddAction,
+                                 self.clusterSubAction, None)
         self.addActions(self.toolBar, self.toolBarActions_4)
-        self.addActions(self.toolBar, self.toolBarActions_5)
 
         self.colorLabelBar = QToolBar("Labels and colors")
         self.addToolBar(Qt.LeftToolBarArea, self.colorLabelBar)
@@ -1128,7 +1141,7 @@ class MainWindow(QMainWindow):
         if (masked_output != 0).any() and not self.hideMask:
             inverted = True
             masked_image_output = cv2.bitwise_and(self.cvimage, self.cvimage, mask=mask_output)
-            temp = cv2.addWeighted(masked_output, 0.6, masked_image_output, 0.4, 0)
+            temp = cv2.addWeighted(masked_output, self.alphaMaskNum, masked_image_output, 1.0-self.alphaMaskNum, 0)
             origin = cv2.bitwise_and(self.cvimage, self.cvimage, mask=cv2.bitwise_not(mask_output))
             dst = cv2.add(temp, origin)
             
@@ -1152,15 +1165,13 @@ class MainWindow(QMainWindow):
 
         if self.regionSegments is not None and not self.hideCluster and not self.showSuggestedCluster:
             # change to overlay
-            alpha = 0.5
             output = dst.copy()
-            cv2.addWeighted(self.clusterMask, alpha, output, 1 - alpha, 0, output)
+            cv2.addWeighted(self.clusterMask, self.alphaClusterNum, output, 1.0 - self.alphaClusterNum, 0, output)
             dst = output
 
         if self.suggestedClusterMask is not None and self.showSuggestedCluster:  # and show suggested cluster only
-            alpha = 0.5
             output = dst.copy()
-            cv2.addWeighted(self.suggestedClusterMask, alpha, output, 1 - alpha, 0, output)
+            cv2.addWeighted(self.suggestedClusterMask, self.alphaClusterNum, output, 1.0 - self.alphaClusterNum, 0, output)
             dst = output
 
         if self.suggestedClusterMask is not None and self.showClusterOutlines:
@@ -1215,6 +1226,14 @@ class MainWindow(QMainWindow):
         self.updateStatus("Undo")
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
+
+    def updateAlphaMaskNum(self):
+        self.alphaMaskNum = self.alphaMaskSpinBox.value()
+        self.showImage()
+
+    def updateAlphaClusterNum(self):
+        self.alphaClusterNum = self.alphaClusterSpinBox.value()
+        self.showImage()
 
     def updateSPNum(self):
         self.spNum = self.spSpinBox.value()
