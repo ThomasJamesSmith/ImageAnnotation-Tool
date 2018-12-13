@@ -121,6 +121,7 @@ class MainWindow(QMainWindow):
         self.finishChoosingArea = False
         self.spActive = False
         self.spNum = 550
+        self.sp_cluster_active = True
         self.alphaMaskNum = 0.5
         self.alphaClusterNum = 0.5
         self.spMask = None
@@ -243,6 +244,9 @@ class MainWindow(QMainWindow):
                                            "open", "Open an existing image file")
         dirOpenAction = self.createAction("&Dir Open...", self.dirOpen, "Ctrl+D",
                                           "open", "Open an existing directory")
+        fileMoveAction = self.createAction("&Move file\n to done...", self.fileMove, "Ctrl+M",
+                                           "move", "Move current file to done folder")
+
         self.saveAction = self.createAction("&Save...", self.saveFile, QKeySequence.Save,
                                        "save", "Save modified image")
         self.saveAction.setEnabled(False)
@@ -419,8 +423,8 @@ class MainWindow(QMainWindow):
         self.lastSpinboxValue = self.zoomSpinBox.value()
 
         self.spSpinBox = QSpinBox()
-        self.spSpinBox.setRange(100, 2000)
-        self.spSpinBox.setValue(550)
+        self.spSpinBox.setRange(50, 5000)
+        self.spSpinBox.setValue(2000)
         self.spSpinBox.setToolTip("Set number of Superpixels")
         self.spSpinBox.setStatusTip(self.spSpinBox.toolTip())
         self.spSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
@@ -455,7 +459,7 @@ class MainWindow(QMainWindow):
 
         # Create menu bar
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenuActions = (fileOpenAction, dirOpenAction, self.saveAction, None, quitAction)
+        self.fileMenuActions = (fileOpenAction, dirOpenAction, fileMoveAction, self.saveAction, None, quitAction)
         self.connect(self.fileMenu, SIGNAL("aboutToShow()"),
                      self.updateFileMenu)
         self.fileMenu.setMaximumWidth(400)
@@ -480,7 +484,7 @@ class MainWindow(QMainWindow):
         self.toolBar.setIconSize(QSize(24, 24))
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self.toolBar.setObjectName("ToolBar")
-        self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, self.undoAction,
+        self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, fileMoveAction, self.undoAction,
                                  quitAction, self.clearAction, None, zoomInAction)
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
@@ -720,7 +724,44 @@ class MainWindow(QMainWindow):
                 item.setForeground(Qt.red)
                 item.setIcon(QIcon(":/delete.png"))
 
-    def dirOpen(self, fromVid = False, dirname = None, applySP = None):
+    def fileMove(self):
+        self.okToContinue()
+        path = config.outputFile(self.filename)
+        path_split = path.split('\\')
+        current_dir = "/".join(path_split[0:len(path_split)-2]) + "/"
+        done_dir = current_dir + "done/"
+        if not os.path.exists(done_dir):
+            os.makedirs(done_dir)
+
+        file_name_dir_split = self.filename.split("\\")
+        file_name_w_ext = file_name_dir_split[-1]
+        self.updateStatus(file_name_w_ext)
+        file_name_w_ext_split = file_name_w_ext.split(".")
+
+        os.rename(self.filename, done_dir + file_name_w_ext)
+
+        current_pred = current_dir + file_name_w_ext_split[0] + "_prediction." + file_name_w_ext_split[-1]
+        current_avg = current_dir + file_name_w_ext_split[0] + "_avg." + file_name_w_ext_split[-1]
+
+        files = False
+
+        if os.path.exists(current_pred):
+            new_pred = done_dir + file_name_w_ext_split[0] + "_prediction." + file_name_w_ext_split[-1]
+            os.rename(current_pred, new_pred)
+            files = True
+
+        if os.path.exists(current_avg):
+            new_avg = done_dir + file_name_w_ext_split[0] + "_avg." + file_name_w_ext_split[-1]
+            os.rename(current_avg, new_avg)
+            files = True
+
+        if files:
+            self.updateStatus("Files moved to done")
+        else:
+            self.updateStatus("File moved to done")
+        self.fileOpen()
+
+    def dirOpen(self, fromVid=False, dirname=None, applySP = None):
         """Open a directory and load the first image"""
         if not self.okToContinue():
             return
@@ -1031,7 +1072,9 @@ class MainWindow(QMainWindow):
             if self.cvimage is None:
                 message = "Failed to read %s" % fname
             else:
-                self.clusterDeactivate()
+                if self.sp_cluster_active:
+                    self.clusterDeactivate()
+                self.sp_cluster_active = True
                 # Create output image directory if not existing
                 if not os.path.exists(config.outputDir(fname)):
                     os.makedirs(config.outputDir(fname))
@@ -1250,6 +1293,7 @@ class MainWindow(QMainWindow):
         self.spMassComplete += 1
         self.updateStatus("SP progress: %d/%d" %(self.spMassComplete, self.spMassTotal))
         self.mutex.unlock()
+        self.sp_cluster_active = self.clusterAction.isEnabled()
         
         if self.spMassComplete == self.spMassTotal:
             self.spMassActive = False
@@ -1594,6 +1638,9 @@ class MainWindow(QMainWindow):
         #             print self.clusterMask[i][j]
         self.clusterActivate()
         self.confirmEdit()
+        self.hideClusterAction.setChecked(False)
+        self.showSuggestedClusterAction.setChecked(False)
+        self.showClusterOutlinesAction.setChecked(False)
 
     def findLabel(self, x, y):
         if x == 0 and y == 0:

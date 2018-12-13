@@ -24,5 +24,6 @@
         <file alias="SPsub.png">icons/SPsub.png</file>
         <file alias="cluster.png">icons/cluster.png</file>
         <file alias="labels.png">icons/labels.png</file>
+        <file alias="move.png">icons/move.png</file>
     </qresource>
 </RCC>
