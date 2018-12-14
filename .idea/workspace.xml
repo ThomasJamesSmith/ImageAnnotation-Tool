@@ -2,8 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="f1e06e3a-26c9-47b0-88c8-6e61c1927c82" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/other.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ImgAnnoTool.py" beforeDir="false" afterPath="$PROJECT_DIR$/ImgAnnoTool.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/qrc_resources.py" beforeDir="false" afterPath="$PROJECT_DIR$/qrc_resources.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/resources.qrc" beforeDir="false" afterPath="$PROJECT_DIR$/resources.qrc" afterDir="false" />
@@ -14,6 +12,9 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="CoverageDataManager">
+    <SUITE FILE_PATH="coverage/Annotation_Tool$ImgAnnoTool.coverage" NAME="ImgAnnoTool Coverage Results" MODIFIED="1544783451324" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
   <component name="FavoritesManager">
     <favorites_list name="Annotation-Tool" />
   </component>
@@ -22,10 +23,10 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ImgAnnoTool.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="284">
-              <caret line="1796" column="8" selection-start-line="1796" selection-start-column="8" selection-end-line="1796" selection-end-column="8" />
+            <state relative-caret-position="120">
+              <caret line="1774" column="26" selection-start-line="1774" selection-start-column="26" selection-end-line="1774" selection-end-column="26" />
               <folding>
-                <element signature="n#!!doc" />
+                <element signature="e#622#631#0" expanded="true" />
                 <element signature="e#1073#1129#0" />
                 <element signature="e#1154#1244#0" />
                 <element signature="e#1310#1663#0" />
@@ -42,15 +43,11 @@
                 <element signature="e#23483#23645#0" />
                 <element signature="e#23576#23848#0" />
                 <element signature="e#24056#24412#0" />
-                <element signature="e#24556#24794#0" />
-                <element signature="e#26405#26566#0" />
                 <element signature="e#26958#27037#0" />
                 <element signature="e#27337#27478#0" />
                 <element signature="e#27329#27440#0" />
                 <element signature="e#27474#27658#0" />
                 <element signature="e#27788#28742#0" />
-                <element signature="e#27970#28318#0" />
-                <element signature="e#28517#28576#0" />
                 <element signature="e#28795#28997#0" />
                 <element signature="e#28882#28997#0" />
                 <element signature="e#29037#29993#0" />
@@ -183,7 +180,6 @@
                 <element signature="e#61760#62293#0" />
                 <element signature="e#61959#62293#0" />
                 <element signature="e#62041#62231#0" />
-                <element signature="e#62329#62653#0" />
                 <element signature="e#62691#63022#0" />
                 <element signature="e#63066#63307#0" />
                 <element signature="e#63354#63608#0" />
@@ -193,7 +189,6 @@
                 <element signature="e#64283#64889#0" />
                 <element signature="e#64465#64553#0" />
                 <element signature="e#64932#65203#0" />
-                <element signature="e#65767#65848#0" />
                 <element signature="e#65890#66345#0" />
                 <element signature="e#65976#66345#0" />
                 <element signature="e#66388#66392#0" />
@@ -225,21 +220,13 @@
                 <element signature="e#74151#74353#0" />
                 <element signature="e#74193#74244#0" />
                 <element signature="e#74397#74705#0" />
-                <element signature="e#74746#75429#0" />
-                <element signature="e#74854#75429#0" />
                 <element signature="e#74984#75121#0" />
-                <element signature="e#75465#75793#0" />
                 <element signature="e#75643#75700#0" />
-                <element signature="e#75841#76013#0" />
-                <element signature="e#76060#76120#0" />
                 <element signature="e#76167#76326#0" />
                 <element signature="e#76281#76300#0" />
-                <element signature="e#76365#76767#0" />
                 <element signature="e#76798#77039#0" />
-                <element signature="e#76899#76951#0" />
                 <element signature="e#77343#77393#0" />
                 <element signature="e#77435#77589#0" />
-                <element signature="e#77544#77563#0" />
                 <element signature="e#78362#78954#0" />
                 <element signature="e#78471#78954#0" />
                 <element signature="e#78997#79263#0" />
@@ -249,7 +236,6 @@
                 <element signature="e#79911#80021#0" />
                 <element signature="e#80096#80206#0" />
                 <element signature="e#80534#80820#0" />
-                <element signature="e#80857#87086#0" />
                 <element signature="e#81364#83113#0" />
                 <element signature="e#83173#83592#0" />
                 <element signature="e#83313#83416#0" />
@@ -258,16 +244,12 @@
                 <element signature="e#84251#84794#0" />
                 <element signature="e#84314#84390#0" />
                 <element signature="e#84495#84595#0" />
-                <element signature="e#84850#85328#0" />
                 <element signature="e#85016#85166#0" />
                 <element signature="e#85064#85166#0" />
-                <element signature="e#85384#85889#0" />
                 <element signature="e#85550#85815#0" />
                 <element signature="e#85598#85815#0" />
-                <element signature="e#85950#86435#0" />
                 <element signature="e#86179#86435#0" />
                 <element signature="e#86227#86435#0" />
-                <element signature="e#86496#86990#0" />
                 <element signature="e#86725#86990#0" />
                 <element signature="e#86773#86990#0" />
                 <element signature="e#87122#87570#0" />
@@ -339,15 +321,6 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/config.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="235">
-              <caret line="21" column="13" selection-start-line="21" selection-start-column="4" selection-end-line="21" selection-end-column="13" />
-            </state>
-          </provider>
-        </entry>
-      </file>
     </leaf>
   </component>
   <component name="FindInProjectRecents">
@@ -361,6 +334,14 @@
       <find>dirOpen</find>
       <find>clusterDeactivate</find>
       <find>dirty</find>
+      <find>hide</find>
+      <find>def hide</find>
+      <find>labelSPAdd</find>
+      <find>sp_queue</find>
+      <find>pressImage</find>
+      <find>spSubAction</find>
+      <find>clusterSubAction</find>
+      <find>DragClusterADD</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -369,6 +350,7 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
+        <option value="$PROJECT_DIR$/resources.qrc" />
         <option value="$PROJECT_DIR$/ImgAnnoTool.py" />
       </list>
     </option>
@@ -471,12 +453,12 @@
       <option name="presentableId" value="Default" />
       <updated>1544448844054</updated>
       <workItem from="1544448847978" duration="1006000" />
-      <workItem from="1544611413372" duration="13408000" />
+      <workItem from="1544611413372" duration="17152000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="14414000" />
+    <option name="totallyTimeSpent" value="18158000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="2576" height="1066" extended-state="6" />
@@ -485,14 +467,14 @@
       <window_info id="Favorites" order="0" sideWeight="0.50159746" side_tool="true" weight="0.25" />
       <window_info content_ui="combo" id="Project" order="1" sideWeight="0.49840257" visible="true" weight="0.12480127" />
       <window_info id="Structure" order="2" sideWeight="0.50159746" side_tool="true" weight="0.25" />
-      <window_info anchor="bottom" id="Terminal" order="0" />
+      <window_info anchor="bottom" id="Terminal" order="0" weight="0.3290461" />
       <window_info anchor="bottom" id="Event Log" order="1" side_tool="true" />
       <window_info anchor="bottom" id="Version Control" order="2" weight="0.3290461" />
       <window_info anchor="bottom" id="Message" order="3" />
       <window_info anchor="bottom" id="Find" order="4" />
       <window_info anchor="bottom" id="Database Changes" order="5" />
       <window_info anchor="bottom" id="Run" order="6" />
-      <window_info anchor="bottom" id="Debug" order="7" weight="0.4" />
+      <window_info active="true" anchor="bottom" id="Debug" order="7" visible="true" weight="0.39978564" />
       <window_info anchor="bottom" id="Cvs" order="8" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="9" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="10" />
@@ -503,7 +485,7 @@
       <window_info anchor="right" id="SciView" order="2" />
       <window_info anchor="right" id="Ant Build" order="3" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="4" weight="0.25" />
-      <window_info active="true" anchor="right" id="Python Console" order="5" sideWeight="0.4994641" visible="true" weight="0.4308426" />
+      <window_info anchor="right" id="Python Console" order="5" sideWeight="0.4994641" visible="true" weight="0.4308426" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -514,18 +496,13 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/ImgAnnoTool.py</url>
-          <line>541</line>
-          <option name="timeStamp" value="5" />
+          <line>1819</line>
+          <option name="timeStamp" value="11" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/ImgAnnoTool.py</url>
-          <line>1419</line>
-          <option name="timeStamp" value="7" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/ImgAnnoTool.py</url>
-          <line>1588</line>
-          <option name="timeStamp" value="8" />
+          <line>1776</line>
+          <option name="timeStamp" value="13" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
@@ -540,13 +517,6 @@
     <entry file="file://$PROJECT_DIR$/colorDialog.py">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/config.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="235">
-          <caret line="21" column="13" selection-start-line="21" selection-start-column="4" selection-end-line="21" selection-end-column="13" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://C:/Python27/Lib/site-packages/skimage/segmentation/slic_superpixels.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="80">
@@ -554,12 +524,26 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/resources.qrc">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="420">
+          <caret line="21" column="62" lean-forward="true" selection-start-line="21" selection-start-column="62" selection-end-line="21" selection-end-column="62" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/config.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="235">
+          <caret line="21" column="13" selection-start-line="21" selection-start-column="4" selection-end-line="21" selection-end-column="13" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/ImgAnnoTool.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="284">
-          <caret line="1796" column="8" selection-start-line="1796" selection-start-column="8" selection-end-line="1796" selection-end-column="8" />
+        <state relative-caret-position="120">
+          <caret line="1774" column="26" selection-start-line="1774" selection-start-column="26" selection-end-line="1774" selection-end-column="26" />
           <folding>
-            <element signature="n#!!doc" />
+            <element signature="e#622#631#0" expanded="true" />
             <element signature="e#1073#1129#0" />
             <element signature="e#1154#1244#0" />
             <element signature="e#1310#1663#0" />
@@ -576,15 +560,11 @@
             <element signature="e#23483#23645#0" />
             <element signature="e#23576#23848#0" />
             <element signature="e#24056#24412#0" />
-            <element signature="e#24556#24794#0" />
-            <element signature="e#26405#26566#0" />
             <element signature="e#26958#27037#0" />
             <element signature="e#27337#27478#0" />
             <element signature="e#27329#27440#0" />
             <element signature="e#27474#27658#0" />
             <element signature="e#27788#28742#0" />
-            <element signature="e#27970#28318#0" />
-            <element signature="e#28517#28576#0" />
             <element signature="e#28795#28997#0" />
             <element signature="e#28882#28997#0" />
             <element signature="e#29037#29993#0" />
@@ -717,7 +697,6 @@
             <element signature="e#61760#62293#0" />
             <element signature="e#61959#62293#0" />
             <element signature="e#62041#62231#0" />
-            <element signature="e#62329#62653#0" />
             <element signature="e#62691#63022#0" />
             <element signature="e#63066#63307#0" />
             <element signature="e#63354#63608#0" />
@@ -727,7 +706,6 @@
             <element signature="e#64283#64889#0" />
             <element signature="e#64465#64553#0" />
             <element signature="e#64932#65203#0" />
-            <element signature="e#65767#65848#0" />
             <element signature="e#65890#66345#0" />
             <element signature="e#65976#66345#0" />
             <element signature="e#66388#66392#0" />
@@ -759,21 +737,13 @@
             <element signature="e#74151#74353#0" />
             <element signature="e#74193#74244#0" />
             <element signature="e#74397#74705#0" />
-            <element signature="e#74746#75429#0" />
-            <element signature="e#74854#75429#0" />
             <element signature="e#74984#75121#0" />
-            <element signature="e#75465#75793#0" />
             <element signature="e#75643#75700#0" />
-            <element signature="e#75841#76013#0" />
-            <element signature="e#76060#76120#0" />
             <element signature="e#76167#76326#0" />
             <element signature="e#76281#76300#0" />
-            <element signature="e#76365#76767#0" />
             <element signature="e#76798#77039#0" />
-            <element signature="e#76899#76951#0" />
             <element signature="e#77343#77393#0" />
             <element signature="e#77435#77589#0" />
-            <element signature="e#77544#77563#0" />
             <element signature="e#78362#78954#0" />
             <element signature="e#78471#78954#0" />
             <element signature="e#78997#79263#0" />
@@ -783,7 +753,6 @@
             <element signature="e#79911#80021#0" />
             <element signature="e#80096#80206#0" />
             <element signature="e#80534#80820#0" />
-            <element signature="e#80857#87086#0" />
             <element signature="e#81364#83113#0" />
             <element signature="e#83173#83592#0" />
             <element signature="e#83313#83416#0" />
@@ -792,16 +761,12 @@
             <element signature="e#84251#84794#0" />
             <element signature="e#84314#84390#0" />
             <element signature="e#84495#84595#0" />
-            <element signature="e#84850#85328#0" />
             <element signature="e#85016#85166#0" />
             <element signature="e#85064#85166#0" />
-            <element signature="e#85384#85889#0" />
             <element signature="e#85550#85815#0" />
             <element signature="e#85598#85815#0" />
-            <element signature="e#85950#86435#0" />
             <element signature="e#86179#86435#0" />
             <element signature="e#86227#86435#0" />
-            <element signature="e#86496#86990#0" />
             <element signature="e#86725#86990#0" />
             <element signature="e#86773#86990#0" />
             <element signature="e#87122#87570#0" />

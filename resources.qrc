@@ -25,5 +25,6 @@
         <file alias="cluster.png">icons/cluster.png</file>
         <file alias="labels.png">icons/labels.png</file>
         <file alias="move.png">icons/move.png</file>
+        <file alias="plus_minus.png">icons/plus_minus.png</file>
     </qresource>
 </RCC>

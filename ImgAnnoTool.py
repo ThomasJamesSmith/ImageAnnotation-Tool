@@ -113,6 +113,8 @@ class MainWindow(QMainWindow):
         self.colourLabels = None
         self.hideImg = False
         self.hideSP = False
+        self.spButton = 0
+        self.clusterButton = 0
         self.hideCluster = False
         self.showSuggestedCluster = False
         self.showClusterOutlines = False
@@ -307,18 +309,19 @@ class MainWindow(QMainWindow):
                                                "cursor", "No Action", True, "toggled(bool)")        
         spGroup.addAction(self.spMouseAction)
         #
-        self.spAddAction = self.createAction("&Add \nSuperpixel", self.labelSPAdd, "Ctrl+{",
-                                             "SPadd", "Add superpixel to segment", True, "toggled(bool)")
+        self.spAddAction = self.createAction("&Add/Remove\nSuperpixel", self.labelSPAdd, "Ctrl+{",
+                                             "plus_minus", "Add(left click)/Remove(right click) superpixel to segment",
+                                             True, "toggled(bool)")
         spGroup.addAction(self.spAddAction)
         #
-        self.spSubAction = self.createAction("&Subtract \nSuperpixel", self.labelSPAdd, "Ctrl+}", 
-                                             "SPsub", "Subtract superpixel from segment", True, "toggled(bool)")
-        spGroup.addAction(self.spSubAction)
+        # self.spSubAction = self.createAction("&Subtract \nSuperpixel", self.labelSPAdd, "Ctrl+}",
+        #                                      "SPsub", "Subtract superpixel from segment", True, "toggled(bool)")
+        # spGroup.addAction(self.spSubAction)
         #
         self.spMouseAction.setChecked(True)
         self.spMouseAction.setEnabled(False)
         self.spAddAction.setEnabled(False)
-        self.spSubAction.setEnabled(False)
+        # self.spSubAction.setEnabled(False)
         self.hidespAction.setEnabled(False)
 
         # Create group of actions for cluster
@@ -329,12 +332,14 @@ class MainWindow(QMainWindow):
                                                     "cursor", "No Action", True, "toggled(bool)")
         clusterGroup.addAction(self.clusterMouseAction)
 
-        self.clusterAddAction = self.createAction("&Add \nCluster", self.labelClusterAdd, "Ctrl+{",
-                                                  "SPadd", "Add cluster to segment", True, "toggled(bool)")
+        self.clusterAddAction = self.createAction("&Add/Remove \nCluster", self.labelClusterAdd, "Ctrl+{",
+                                                  "plus_minus", "Add(left click)/Remove(right click) cluster to segment",
+                                                  True, "toggled(bool)")
+
         clusterGroup.addAction(self.clusterAddAction)
-        self.clusterSubAction = self.createAction("&Subtract \nCluster", self.labelClusterAdd, "Ctrl+}",
-                                                  "SPsub", "Subtract cluster frp, segment", True, "toggled(bool)")
-        clusterGroup.addAction(self.clusterSubAction)
+        # self.clusterSubAction = self.createAction("&Subtract \nCluster", self.labelClusterAdd, "Ctrl+}",
+        #                                           "SPsub", "Subtract cluster frp, segment", True, "toggled(bool)")
+        # clusterGroup.addAction(self.clusterSubAction)
 
         self.hideClusterAction = self.createAction("&Hide\nCluster", self.hideButtonClick, "Alt+H",
                                                    "hide", "Hide cluster overlay", True, "toggled(bool)")
@@ -352,7 +357,7 @@ class MainWindow(QMainWindow):
         self.clusterMouseAction.setChecked(True)
         self.clusterMouseAction.setEnabled(False)
         self.clusterAddAction.setEnabled(False)
-        self.clusterSubAction.setEnabled(False)
+        # self.clusterSubAction.setEnabled(False)
         self.hideClusterAction.setEnabled(False)
         self.showSuggestedClusterAction.setEnabled(False)
         self.showClusterOutlinesAction.setEnabled(False)
@@ -503,9 +508,10 @@ class MainWindow(QMainWindow):
         self.addActions(self.toolBar, self.toolBarActions_3)
         self.toolBar.addWidget(self.spSpinBox)
 
-        self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, self.spSubAction, None,
-                                 self.clusterAction, self.clusterMouseAction, self.clusterAddAction,
-                                 self.clusterSubAction, None)
+        # self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, self.spSubAction, None,
+        self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, None,
+                                 self.clusterAction, self.clusterMouseAction, self.clusterAddAction, None)
+        #                          self.clusterSubAction, None)
         self.addActions(self.toolBar, self.toolBarActions_4)
 
         self.colorLabelBar = QToolBar("Labels and colors")
@@ -1421,7 +1427,7 @@ class MainWindow(QMainWindow):
         self.spActive = True
         self.spMouseAction.setEnabled(True)
         self.spAddAction.setEnabled(True)
-        self.spSubAction.setEnabled(True)
+        # self.spSubAction.setEnabled(True)
         self.hidespAction.setEnabled(True)
         self.spAction.setEnabled(False)
         self.spAddAction.setChecked(True)
@@ -1431,7 +1437,7 @@ class MainWindow(QMainWindow):
         self.spActive = False
         self.spMouseAction.setEnabled(False)
         self.spAddAction.setEnabled(False)
-        self.spSubAction.setEnabled(False)
+        # self.spSubAction.setEnabled(False)
         self.hidespAction.setEnabled(False)
         self.spAction.setEnabled(True)
         self.spMouseAction.setChecked(True)
@@ -1578,7 +1584,7 @@ class MainWindow(QMainWindow):
     def clusterActivate(self):
         self.clusterActive = True
         self.clusterMouseAction.setEnabled(True)
-        self.clusterSubAction.setEnabled(True)
+        # self.clusterSubAction.setEnabled(True)
         self.clusterAddAction.setEnabled(True)
         self.hideClusterAction.setEnabled(True)
         self.showSuggestedClusterAction.setEnabled(True)
@@ -1590,7 +1596,7 @@ class MainWindow(QMainWindow):
         self.clusterActive = False
         self.clusterMouseAction.setEnabled(False)
         self.clusterAddAction.setEnabled(False)
-        self.clusterSubAction.setEnabled(False)
+        # self.clusterSubAction.setEnabled(False)
         self.hideClusterAction.setEnabled(False)
         self.showSuggestedClusterAction.setEnabled(False)
         self.clusterPaletteAction.setEnabled(False)
@@ -1737,7 +1743,7 @@ class MainWindow(QMainWindow):
 
             if self.spAddAction.isEnabled():
                 self.spAddAction.setChecked(False)
-                self.spSubAction.setChecked(False)
+                # self.spSubAction.setChecked(False)
                 self.spMouseAction.setChecked(True)
 
             self.isLaballing = False
@@ -1758,7 +1764,8 @@ class MainWindow(QMainWindow):
         self.showImage()
 
     def startClusterAdd(self, event):
-        """Start labelling sp"""
+        """Start labelling cluster"""
+        self.clusterButton = event.button()
         self.imageLabel.setMouseTracking(True)
         self.isLaballing = True
         self.clusterPosition = event.pos()
@@ -1772,6 +1779,7 @@ class MainWindow(QMainWindow):
         """Finish labelling sp"""
         self.imageLabel.setMouseTracking(False)
         self.cluster_queue = []
+        self.clusterButton = 0
         #self.confirmEdit()
         #self.showImage()
 
@@ -1779,9 +1787,9 @@ class MainWindow(QMainWindow):
         factor = self.zoomSpinBox.value() * 1.0 / 100.0
         x = int(round(pos.x() / factor))
         y = int(round(pos.y() / factor))
-        if self.spAddAction.isChecked() or self.spSubAction.isChecked():
+        if not self.spButton == 0:
             label = self.spSegments[y][x]
-        elif self.clusterAddAction.isChecked() or self.clusterSubAction.isChecked():
+        elif not self.clusterButton == 0:
             label = self.regionSegments[y][x]
         return label, x, y
 
@@ -1796,6 +1804,8 @@ class MainWindow(QMainWindow):
 
     def startSPAdd(self, event):
         """Start labelling sp"""
+        self.spButton = event.button()
+
         self.imageLabel.setMouseTracking(True)
         self.lastSpinboxValue = self.zoomSpinBox.value()
         self.isLaballing = True
@@ -1810,6 +1820,7 @@ class MainWindow(QMainWindow):
         """Finish labelling sp"""
         self.imageLabel.setMouseTracking(False)
         self.sp_queue = []
+        self.spButton = 0
         #self.confirmEdit()
         #self.showImage()
 
@@ -1821,7 +1832,7 @@ class MainWindow(QMainWindow):
 
             if self.clusterAddAction.isEnabled():
                 self.clusterAddAction.setChecked(False)
-                self.clusterSubAction.setChecked(False)
+                # self.clusterSubAction.setChecked(False)
                 self.clusterMouseAction.setChecked(True)
 
 
@@ -1971,7 +1982,7 @@ class MainWindow(QMainWindow):
             self.showImage()
             self.notFinishAreaChoosing()
             self.updateStatus("Label selected polygon area")
-        elif self.spAddAction.isChecked():
+        elif self.spButton == 1:  # self.spAddAction.isChecked():
             label, x, y = self.getLabel(self.spPosition)
             indices = np.argwhere(self.spSegments == label)
             for i in range(0, len(indices)):
@@ -1979,7 +1990,7 @@ class MainWindow(QMainWindow):
                         self.currentColor.green(), self.currentColor.blue()]
             self.updateStatus("Superpixel at x:%d y:%d added" % (x, y))
             #self.updateStatus("Superpixel at x:%d y:%d added, label:%d" % (x, y, label))
-        elif self.spSubAction.isChecked():
+        elif self.spButton == 2:  # self.spSubAction.isChecked():
             label, x, y = self.getLabel(self.spPosition)
             indices = np.argwhere(self.spSegments == label)
             for i in range(0, len(indices)):
@@ -1987,7 +1998,7 @@ class MainWindow(QMainWindow):
                                                                  self.backgroundColor.green(),
                                                                  self.backgroundColor.blue()]
             self.updateStatus("Superpixel at x:%d y:%d removed" % (x, y))
-        elif self.clusterAddAction.isChecked():
+        elif self.clusterButton == 1:
             self.updateStatus("updating add cluster")
             label, x, y = self.getLabel(self.clusterPosition)
             indices = np.argwhere(self.regionSegments == label)
@@ -1995,7 +2006,7 @@ class MainWindow(QMainWindow):
                 self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
                                                                  self.currentColor.green(),
                                                                  self.currentColor.blue()]
-        elif self.clusterSubAction.isChecked():
+        elif self.clusterButton == 2:
             self.updateStatus("updating sub cluster")
             label, x, y = self.getLabel(self.clusterPosition)
             indices = np.argwhere(self.regionSegments == label)
