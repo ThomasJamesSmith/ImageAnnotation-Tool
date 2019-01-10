@@ -1,18 +1,11 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 # This is Image Annotation Tool for annotating plantations.
-# Created by Jingxiao Ma.
+# Created by Jingxiao Ma, and Thomas J. Smith.
 # Languages: python 2 (2.7)
 # Sys requirement: Linux / Windows 7 / OS X 10.8 or later versions
 # Package requirement: PyQt 4 / OpenCv 2 / numpy
 
-#
-#   use the segments from sp as overlay
-#   np.where(a == 1)
-#   can select a segment, when selected search sp_img for all occurences of label
-#   selected pixels are then added to the mask
-#   have option to remove segment from mask
-#
 
 # compile new icons
 # C:\Python27\Lib\site-packages\PyQt4\pyrcc4.exe -o qrc_resources.py resources.qrc
@@ -48,7 +41,7 @@ except ImportError:
     from PyQt5.QtWidgets import *
 
 
-__version__ = '1.2'
+__version__ = '2.1'
 
 
 class OpeningDirDialog(QMessageBox):
@@ -226,52 +219,80 @@ class MainWindow(QMainWindow):
         # Add a dock widget for viewing actions
         self.logDockWidget = QDockWidget("Log", self)
         self.logDockWidget.setObjectName("LogDockWidget")
-        self.logDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea |
-                                           Qt.RightDockWidgetArea)
+        self.logDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+
         self.listWidget = QListWidget()
         self.logDockWidget.setWidget(self.listWidget)
         self.addDockWidget(Qt.RightDockWidgetArea, self.logDockWidget)
 
         # Set status bar
         self.sizeLabel = QLabel()
-        self.sizeLabel.setFrameStyle(QFrame.StyledPanel|
-                                     QFrame.Sunken)
+        self.sizeLabel.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         status = self.statusBar()
         status.setSizeGripEnabled(False)
         status.addPermanentWidget(self.sizeLabel)
         status.showMessage("Ready", 5000)
 
+        ###
+        # open          = Ctrl+O
+        # Dir Open      = Ctrl+D
+        # Move file     = Ctrl+M
+        # Save          = Ctrl+S
+        # Undo          = Ctrl+Z
+        # Quit          = Ctrl+Q
+        # Zoom in       = Ctrl+=
+        # Zoom out      = Ctrl+-
+        # Hide Log      = Ctrl+L
+        # Hide Image    = Ctrl+1
+        # Hide Mask     = Ctrl+2
+        # Hide Sp       = Ctrl+3
+        # Hide Cluster  = Ctrl+4
+        # Show Sug Clus = Ctrl+5
+        # Show Clus Out = Ctrl+6
+        # Chan Out Col  = Ctrl+7
+        # None Geo      = Alt+1
+        # Rectangle     = Alt+2
+        # Elipse        = Alt+3
+        # Polygon       = Alt+4
+        # None SP       = Alt+5
+        # Add SP        = Alt+6
+        # None Cluster  = Alt+7
+        # Add Cluster   = Alt+7
+        # Run Cluster   = Alt+C
+        # Run SP        = Alt+S
+        # Clear         = Alt+X
+        # ###
+
         # Create actions
-        fileOpenAction = self.createAction("&Open...", self.fileOpen, QKeySequence.Open,
+        fileOpenAction = self.createAction("&Open...", self.fileOpen, "Ctrl+O",
                                            "open", "Open an existing image file")
         dirOpenAction = self.createAction("&Dir Open...", self.dirOpen, "Ctrl+D",
                                           "open", "Open an existing directory")
         fileMoveAction = self.createAction("&Move file\n to done...", self.fileMove, "Ctrl+M",
                                            "move", "Move current file to done folder")
 
-        self.saveAction = self.createAction("&Save...", self.saveFile, QKeySequence.Save,
+        self.saveAction = self.createAction("&Save...", self.saveFile, "Ctrl+S",
                                        "save", "Save modified image")
         self.saveAction.setEnabled(False)
 
-        self.undoAction = self.createAction("&Undo...", self.undo, QKeySequence.Undo,
+        self.undoAction = self.createAction("&Undo...", self.undo, "Ctrl+Z",
                                             "undo", "Undo the last operation. "
                                             "NOTE: This operation is irreversible.")
         self.undoAction.setEnabled(False)
 
-        quitAction = self.createAction("&Quit...", self.close, QKeySequence.Quit,
+        quitAction = self.createAction("&Quit...", self.close, "Ctrl+Q",
                                        "close", "Close the application")
-        zoomInAction = self.createAction("&Zoom\nIn...", self.zoomIn, "Alt+Z",
+        zoomInAction = self.createAction("&Zoom\nIn...", self.zoomIn, "Ctrl+=",
                                          "zoom-in", "Zoom in image")
-        zoomOutAction = self.createAction("&Zoom\nout...", self.zoomOut, "Alt+O",
+        zoomOutAction = self.createAction("&Zoom\nout...", self.zoomOut, "Ctrl+-",
                                           "zoom-out", "Zoom out image")
         hideLogViewerAction = self.createAction("&Hide Log...", self.hideLog, "Alt+L",
                                                 None, "Hide log dock")
-        showLogViewerAction = self.createAction("&Show Log...", self.showLog, "Alt+K",
-                                                None, "Show log dock")
 
-        self.hideOriginalAction = self.createAction("&Hide\nImage", self.hideButtonClick, "Ctrl+H",
+
+        self.hideOriginalAction = self.createAction("&Hide\nImage", self.hideButtonClick, "Ctrl+1",
                                                     "hide", "Hide original image", True, "toggled(bool)")
-        self.hideMaskAction = self.createAction("&Hide\nMask", self.hideButtonClick, "Ctrl+H",
+        self.hideMaskAction = self.createAction("&Hide\nMask", self.hideButtonClick, "Ctrl+2",
                                                     "hide", "Hide original image", True, "toggled(bool)")
         self.hideOriginalAction.setChecked(False)
         self.hideMaskAction.setChecked(False)
@@ -290,7 +311,7 @@ class MainWindow(QMainWindow):
                                                  "toggled(bool)")
         self.floodFillAction.setEnabled(False)
 
-        self.clearAction = self.createAction("&Clear...", self.clearLabel, "Del",
+        self.clearAction = self.createAction("&Clear...", self.clearLabel, "Alt+X",
                                               "delete", "Clear all.")
         self.clearAction.setEnabled(True)
 
@@ -298,18 +319,18 @@ class MainWindow(QMainWindow):
         self.spAction = self.createAction("&Superpixel", self.runSuperpixelAlg, "Alt+s", "superpixel",
                                           "Run superpixel Algorithm")
         
-        self.hidespAction = self.createAction("&Hide\nSuperpixels", self.hideButtonClick, "Alt+H",
+        self.hidespAction = self.createAction("&Hide\nSuperpixels", self.hideButtonClick, "Ctrl+3",
                                                     "hide", "Hide superpixel overlay", True, "toggled(bool)")
 
 
         # Create group of actions for superpixels
         spGroup = QActionGroup(self)
         #
-        self.spMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+p",
+        self.spMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+5",
                                                "cursor", "No Action", True, "toggled(bool)")        
         spGroup.addAction(self.spMouseAction)
         #
-        self.spAddAction = self.createAction("&Add/Remove\nSuperpixel", self.labelSPAdd, "Ctrl+{",
+        self.spAddAction = self.createAction("&Add/Remove\nSuperpixel", self.labelSPAdd, "Alt+6",
                                              "plus_minus", "Add(left click)/Remove(right click) superpixel to segment",
                                              True, "toggled(bool)")
         spGroup.addAction(self.spAddAction)
@@ -326,30 +347,31 @@ class MainWindow(QMainWindow):
 
         # Create group of actions for cluster
         clusterGroup = QActionGroup(self)
-        self.clusterAction = self.createAction("&Cluster", self.runClusterAlg, "Alt+s", "cluster",
+        self.clusterAction = self.createAction("&Cluster", self.runClusterAlg, "Alt+c", "cluster",
                                                "add cluster overlay")
-        self.clusterMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+c",
+        self.clusterMouseAction = self.createAction("&None...", self.setMouseAction, "Alt+7",
                                                     "cursor", "No Action", True, "toggled(bool)")
         clusterGroup.addAction(self.clusterMouseAction)
 
-        self.clusterAddAction = self.createAction("&Add/Remove \nCluster", self.labelClusterAdd, "Ctrl+{",
-                                                  "plus_minus", "Add(left click)/Remove(right click) cluster to segment",
-                                                  True, "toggled(bool)")
+        self.clusterAddAction = self.createAction("&Add/Remove \nCluster", self.labelClusterAdd, "Alt+8",
+                                                  "plus_minus", "Add(left click)/Remove(right click) cluster to segment"
+                                                  , True, "toggled(bool)")
 
         clusterGroup.addAction(self.clusterAddAction)
         # self.clusterSubAction = self.createAction("&Subtract \nCluster", self.labelClusterAdd, "Ctrl+}",
         #                                           "SPsub", "Subtract cluster frp, segment", True, "toggled(bool)")
         # clusterGroup.addAction(self.clusterSubAction)
 
-        self.hideClusterAction = self.createAction("&Hide\nCluster", self.hideButtonClick, "Alt+H",
+        self.hideClusterAction = self.createAction("&Hide\nCluster", self.hideButtonClick, "Ctrl+4",
                                                    "hide", "Hide cluster overlay", True, "toggled(bool)")
-        self.showSuggestedClusterAction = self.createAction("&Show\nSuggested\nCluster", self.hideButtonClick, "Alt+H",
-                                                            "hide", "Show suggested cluster overlay", True, "toggled(bool)")
+        self.showSuggestedClusterAction = self.createAction("&Show\nSuggested\nCluster", self.hideButtonClick, "Ctrl+5",
+                                                            "hide", "Show suggested cluster overlay", True,
+                                                            "toggled(bool)")
 
-        self.showClusterOutlinesAction = self.createAction("&Show\nCluster\nOutline", self.hideButtonClick, "Alt+H",
+        self.showClusterOutlinesAction = self.createAction("&Show\nCluster\nOutline", self.hideButtonClick, "Ctrl+6",
                                                             "hide", "Show cluster outline overlay", True,
                                                             "toggled(bool)")
-        self.clusterPaletteAction = self.createAction("&Change Outline\nColour", self.chooseOutlineColor, "Ctrl+L",
+        self.clusterPaletteAction = self.createAction("&Change Outline\nColour", self.chooseOutlineColor, "Ctrl+7",
                                                       None, "Choose the color to label items")
         clusterGroup.addAction(self.clusterPaletteAction)
         self.clusterPaletteAction.setEnabled(False)
@@ -391,16 +413,16 @@ class MainWindow(QMainWindow):
 
         # Create group of actions for labelling image
         editGroup = QActionGroup(self)
-        self.mouseAction = self.createAction("&None...", self.setMouseAction, "Alt+0",
+        self.mouseAction = self.createAction("&None...", self.setMouseAction, "Alt+1",
                                         "cursor", "No Action", True, "toggled(bool)")
         editGroup.addAction(self.mouseAction)
-        self.rectLabelAction = self.createAction("&Rect...", self.labelRectOrEllipse, "Alt+1",
+        self.rectLabelAction = self.createAction("&Rect...", self.labelRectOrEllipse, "Alt+2",
                                        "rectangle", "Annotation a rectangle area", True, "toggled(bool)")
         editGroup.addAction(self.rectLabelAction)
-        self.ellipseLabelAction = self.createAction("&Ellipse...", self.labelRectOrEllipse, "Alt+2",
+        self.ellipseLabelAction = self.createAction("&Ellipse...", self.labelRectOrEllipse, "Alt+3",
                                                  "ellipse", "Annotation an ellipse area", True, "toggled(bool)")
         editGroup.addAction(self.ellipseLabelAction)
-        self.polygonLabelAction = self.createAction("&Polygon...", self.labelPolygon, "Alt+3",
+        self.polygonLabelAction = self.createAction("&Polygon...", self.labelPolygon, "Alt+4",
                                                     "polygon", "Annotation an irregular polygon area",
                                                     True, "toggled(bool)")
         editGroup.addAction(self.polygonLabelAction)
@@ -477,7 +499,7 @@ class MainWindow(QMainWindow):
 
         viewMenu = self.menuBar().addMenu("&View")
         self.addActions(viewMenu, (zoomInAction, zoomOutAction, self.hideOriginalAction, self.hideMaskAction,
-                                   None, hideLogViewerAction, showLogViewerAction))
+                                   None, hideLogViewerAction))
 
         helpMenu = self.menuBar().addMenu("&Help")
         self.addActions(helpMenu, (helpAboutAction, helpHelpAction, None))
@@ -652,8 +674,24 @@ class MainWindow(QMainWindow):
             self.colorLabelBar.show()
             self.labelsGroup = QActionGroup(self)
             self.colorLabelDict = {}
+            shortcuts = []
+            for i in range(0, 10):
+                for j in [0] + range(i + 1, 10):
+                    if i == 0:
+                        shortcuts.append(j)
+                    else:
+                        shortcuts.append([i, j])
+            count = 0
             for label in self.colourLabels.keys():
-                action = self.createAction(label, self.chooseColor_2, None,
+                shortcut = "Shift+"
+                if count < 10:
+                    shortcut += str(shortcuts[count])
+                else:
+                    shortcut += str(shortcuts[count][0]) + "+" + str(shortcuts[count][1])
+
+                count += 1
+                print shortcut
+                action = self.createAction(label, self.chooseColor_2, shortcut,
                                            None, "Color the label with user specified color",
                                            True, "toggled(bool)")
                 icon = QPixmap(50, 50)
@@ -746,13 +784,13 @@ class MainWindow(QMainWindow):
 
         os.rename(self.filename, done_dir + file_name_w_ext)
 
-        current_pred = current_dir + file_name_w_ext_split[0] + "_prediction." + file_name_w_ext_split[-1]
+        current_pred = current_dir + file_name_w_ext_split[0] + "_suggested." + file_name_w_ext_split[-1]
         current_avg = current_dir + file_name_w_ext_split[0] + "_avg." + file_name_w_ext_split[-1]
 
         files = False
 
         if os.path.exists(current_pred):
-            new_pred = done_dir + file_name_w_ext_split[0] + "_prediction." + file_name_w_ext_split[-1]
+            new_pred = done_dir + file_name_w_ext_split[0] + "_suggested." + file_name_w_ext_split[-1]
             os.rename(current_pred, new_pred)
             files = True
 
@@ -1616,7 +1654,7 @@ class MainWindow(QMainWindow):
         self.updateStatus("Opening Cluster")
         split_file_dir = self.filename.split('.')
         avg_path = split_file_dir[0] + "_avg." + split_file_dir[1]
-        pred_path = split_file_dir[0] + "_prediction." + split_file_dir[1]
+        pred_path = split_file_dir[0] + "_suggested." + split_file_dir[1]
         if not QFile.exists(avg_path):
             self.updateStatus("Average superpixel image does not exist: " + avg_path)
             return
@@ -2209,11 +2247,11 @@ class MainWindow(QMainWindow):
             icon.fill(self.currentColor)
             self.paletteAction.setIcon(QIcon(icon))
 
-    def showLog(self):
-        self.logDockWidget.show()
-
     def hideLog(self):
-        self.logDockWidget.hide()
+        if self.logDockWidget.isVisible():
+            self.logDockWidget.hide()
+        else:
+            self.logDockWidget.show()
 
     def zoomIn(self):
         """Zoom in by 5%"""
@@ -2290,24 +2328,101 @@ class MainWindow(QMainWindow):
 
     def helpAbout(self):
         QMessageBox.about(self, "About Image Annotation Tool",
-                                """<b>Image Annotation Tool</b> v %s
-                                <p>This application can be used to annotate images,
-                                especially for plantations.
-                                <p>Python %s - Qt %s - PyQt %s on %s
-                                <p>By Jingxiao Ma, School of Computer Science, 
-                                University of Nottingham\nEmail: psyjm7@nottingham.ac.uk"""
+                                """<html><head/><body>
+                                <b>Image Annotation Tool</b> v %s
+                                <p>Welcome to the image annotation tool. There are currently 3 mode of use.</p>
+                                <ol>
+                                <li>Geometric annotations</li>
+                                <li>Superpixel annotations</li>
+                                <li>Super-cluster annotations</li>
+                                </ol>
+                                <p>Example dataset types are plants, litter, and medical.</p>
+                                <p>Python %s - Qt %s - PyQt %s on %s</p>
+                                <p>Aurthors: </p>
+                                <ul>
+                                <li>Geometric Annotations: Jingxiao Ma</li> 
+                                <li>Superpixel and Clusters: Thomas J. Smith</li>
+                                </ul> 
+                                <p>Computer Vision Lab,</p>
+                                <p>School of Computer Science,</p>
+                                <p>University of Nottingham</p>
+                                </body></html>"""
                                 %( __version__, platform.python_version(), QT_VERSION_STR,
                                 PYQT_VERSION_STR, platform.system()))
 
     def helpHelp(self):
         QMessageBox.about(self, "Help -- Image Annotation Tool",
-                          """<b>Usage:</b>
-                          <p>1. Open a directory or an image.\n
-                          2. Choose color.\n
-                          3. Choose a shape and region.\n
-                          4. Confirm, unlabel or perform flood-fill.\n
-                          5. Save image when finish annotating.
-                          <p>For details, please check user manual in docs folder.""")
+                          """<html><head/><body>
+                          <b>Usage:</b>
+                          <ol>
+                          <li>Open a directory or an image.</li>
+                          <li>Choose color.</li>
+                          <li>Choose a shape and region.</li>
+                          <li>Confirm, unlabel or perform flood-fill.</li> 
+                          <li>Save image when finish annotating.</li>
+                          </ol>
+                          <p>
+                          For details, please check user manual in docs folder.\n
+                          </p>
+                          <br/>
+                          <b>Keyboard Shortcuts:</b>
+                          <table cellpadding=10 border=1>
+                          <tr>
+                          <td>open          = Ctrl+O</td>
+                          <td>Directory Open= Ctrl+D</td>
+                          <td>Move file     = Ctrl+M</td>
+                          </tr>
+                          <tr>
+                          <td>Save          = Ctrl+S</td>
+                          <td>Undo          = Ctrl+Z</td>
+                          <td>Quit          = Ctrl+Q</td>
+                          </tr>
+                          <tr>
+                          <td>Zoom in       = Ctrl+=</td>
+                          <td>Zoom out      = Ctrl+-</td>
+                          <td>Hide Log      = Ctrl+L</td>
+                          </tr>
+                          <tr>
+                          <td>Hide Image    = Ctrl+1</td>
+                          <td>Hide Mask     = Ctrl+2</td>
+                          <td>Hide Superpixel Outline = Ctrl+3</td>
+                          </tr>
+                          <tr>
+                          <td>Hide Cluster  = Ctrl+4</td>
+                          <td>Show Suggested Clusters = Ctrl+5</td>
+                          <td>Show Cluster Outlines = Ctrl+6</td>
+                          </tr>
+                          <tr>
+                          <td>Change Outline Colour = Ctrl+7</td>
+                          <td>None Geometric= Alt+1</td>
+                          <td>Rectangle     = Alt+2</td>
+                          </tr>
+                          <tr>
+                          <td>Elipse        = Alt+3</td>
+                          <td>Polygon       = Alt+4</td>
+                          <td>None SP       = Alt+5</td>
+                          </tr>
+                          <tr>
+                          <td>Add SP        = Alt+6</td>
+                          <td>None Cluster  = Alt+7</td>
+                          <td>Add Cluster   = Alt+8</td>
+                          </tr>
+                          <tr>
+                          <td>Run Cluster   = Alt+C</td>
+                          <td>Run Superpixel= Alt+S</td>
+                          <td>Clear         = Alt+X</td>
+                          </tr>
+                          </table>
+                          <p>Label colour shortcuts use shift plus a number:</p>
+                          <ul>
+                          <li>unknown:  shift+0</li>
+                          <li>colour 1: shift+1</li>
+                          <li>colour 10: shift+1+0</li>
+                          <li>colour 11: skip as uses duplicate key</li>
+                          <li>colour 12: shift+1+2</li>
+                          <li>colour 21: skip as uses same keys as 12</li>
+                          </ul>
+                          </body></html>""")
 
     @staticmethod
     def normalise(norm_input, max_num=1):

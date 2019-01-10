@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="f1e06e3a-26c9-47b0-88c8-6e61c1927c82" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/ImgAnnoTool.py" beforeDir="false" afterPath="$PROJECT_DIR$/ImgAnnoTool.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/qrc_resources.py" beforeDir="false" afterPath="$PROJECT_DIR$/qrc_resources.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/resources.qrc" beforeDir="false" afterPath="$PROJECT_DIR$/resources.qrc" afterDir="false" />
-    </list>
+    <list default="true" id="f1e06e3a-26c9-47b0-88c8-6e61c1927c82" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -23,8 +19,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ImgAnnoTool.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="120">
-              <caret line="1774" column="26" selection-start-line="1774" selection-start-column="26" selection-end-line="1774" selection-end-column="26" />
+            <state relative-caret-position="171">
+              <caret line="1774" selection-start-line="1774" selection-end-line="1774" />
               <folding>
                 <element signature="e#622#631#0" expanded="true" />
                 <element signature="e#1073#1129#0" />
@@ -224,7 +220,9 @@
                 <element signature="e#75643#75700#0" />
                 <element signature="e#76167#76326#0" />
                 <element signature="e#76281#76300#0" />
+                <element signature="e#78346#78784#0" />
                 <element signature="e#76798#77039#0" />
+                <element signature="e#79072#79291#0" />
                 <element signature="e#77343#77393#0" />
                 <element signature="e#77435#77589#0" />
                 <element signature="e#78362#78954#0" />
@@ -453,16 +451,15 @@
       <option name="presentableId" value="Default" />
       <updated>1544448844054</updated>
       <workItem from="1544448847978" duration="1006000" />
-      <workItem from="1544611413372" duration="17152000" />
+      <workItem from="1544611413372" duration="18519000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="18158000" />
+    <option name="totallyTimeSpent" value="19525000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="2576" height="1066" extended-state="6" />
-    <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" sideWeight="0.50159746" side_tool="true" weight="0.25" />
       <window_info content_ui="combo" id="Project" order="1" sideWeight="0.49840257" visible="true" weight="0.12480127" />
@@ -474,7 +471,7 @@
       <window_info anchor="bottom" id="Find" order="4" />
       <window_info anchor="bottom" id="Database Changes" order="5" />
       <window_info anchor="bottom" id="Run" order="6" />
-      <window_info active="true" anchor="bottom" id="Debug" order="7" visible="true" weight="0.39978564" />
+      <window_info anchor="bottom" id="Debug" order="7" weight="0.39978564" />
       <window_info anchor="bottom" id="Cvs" order="8" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="9" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="10" />
@@ -485,7 +482,7 @@
       <window_info anchor="right" id="SciView" order="2" />
       <window_info anchor="right" id="Ant Build" order="3" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="4" weight="0.25" />
-      <window_info anchor="right" id="Python Console" order="5" sideWeight="0.4994641" visible="true" weight="0.4308426" />
+      <window_info active="true" anchor="right" id="Python Console" order="5" sideWeight="0.4994641" visible="true" weight="0.4308426" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -496,12 +493,12 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/ImgAnnoTool.py</url>
-          <line>1819</line>
+          <line>1818</line>
           <option name="timeStamp" value="11" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/ImgAnnoTool.py</url>
-          <line>1776</line>
+          <line>1775</line>
           <option name="timeStamp" value="13" />
         </line-breakpoint>
       </breakpoints>
@@ -540,8 +537,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/ImgAnnoTool.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="120">
-          <caret line="1774" column="26" selection-start-line="1774" selection-start-column="26" selection-end-line="1774" selection-end-column="26" />
+        <state relative-caret-position="171">
+          <caret line="1774" selection-start-line="1774" selection-end-line="1774" />
           <folding>
             <element signature="e#622#631#0" expanded="true" />
             <element signature="e#1073#1129#0" />
@@ -741,7 +738,9 @@
             <element signature="e#75643#75700#0" />
             <element signature="e#76167#76326#0" />
             <element signature="e#76281#76300#0" />
+            <element signature="e#78346#78784#0" />
             <element signature="e#76798#77039#0" />
+            <element signature="e#79072#79291#0" />
             <element signature="e#77343#77393#0" />
             <element signature="e#77435#77589#0" />
             <element signature="e#78362#78954#0" />
