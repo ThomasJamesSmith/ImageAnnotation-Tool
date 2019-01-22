@@ -690,7 +690,6 @@ class MainWindow(QMainWindow):
                     shortcut += str(shortcuts[count][0]) + "+" + str(shortcuts[count][1])
 
                 count += 1
-                print shortcut
                 action = self.createAction(label, self.chooseColor_2, shortcut,
                                            None, "Color the label with user specified color",
                                            True, "toggled(bool)")
@@ -1793,6 +1792,8 @@ class MainWindow(QMainWindow):
 
     def addCluster(self):
         label, x, y = self.getLabel(self.clusterPosition)
+        if label is None:
+            return
         # print self.clusterPosition.x(), self.clusterPosition.y()
         for i in range(len(self.cluster_queue)):
             if self.cluster_queue[i] == label:
@@ -1825,6 +1826,8 @@ class MainWindow(QMainWindow):
         factor = self.zoomSpinBox.value() * 1.0 / 100.0
         x = int(round(pos.x() / factor))
         y = int(round(pos.y() / factor))
+        if x < 0 or x > self.spSegments.shape[1] or y < 0 or y > self.spSegments.shape[0]:
+            return None, None, None
         if not self.spButton == 0:
             label = self.spSegments[y][x]
         elif not self.clusterButton == 0:
@@ -1833,6 +1836,8 @@ class MainWindow(QMainWindow):
 
     def addSP(self):
         label, x, y = self.getLabel(self.spPosition)
+        if label is None:
+            return
         for i in range(len(self.sp_queue)):
             if self.sp_queue[i] == label:
                 return
@@ -2022,36 +2027,40 @@ class MainWindow(QMainWindow):
             self.updateStatus("Label selected polygon area")
         elif self.spButton == 1:  # self.spAddAction.isChecked():
             label, x, y = self.getLabel(self.spPosition)
-            indices = np.argwhere(self.spSegments == label)
-            for i in range(0, len(indices)):
-                self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
-                        self.currentColor.green(), self.currentColor.blue()]
-            self.updateStatus("Superpixel at x:%d y:%d added" % (x, y))
-            #self.updateStatus("Superpixel at x:%d y:%d added, label:%d" % (x, y, label))
+            if label is not None:
+                indices = np.argwhere(self.spSegments == label)
+                for i in range(0, len(indices)):
+                    self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
+                            self.currentColor.green(), self.currentColor.blue()]
+                # self.updateStatus("Superpixel at x:%d y:%d added" % (x, y))
+                #self.updateStatus("Superpixel at x:%d y:%d added, label:%d" % (x, y, label))
         elif self.spButton == 2:  # self.spSubAction.isChecked():
             label, x, y = self.getLabel(self.spPosition)
-            indices = np.argwhere(self.spSegments == label)
-            for i in range(0, len(indices)):
-                self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(),
-                                                                 self.backgroundColor.green(),
-                                                                 self.backgroundColor.blue()]
-            self.updateStatus("Superpixel at x:%d y:%d removed" % (x, y))
+            if label is not None:
+                indices = np.argwhere(self.spSegments == label)
+                for i in range(0, len(indices)):
+                    self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(),
+                                                                     self.backgroundColor.green(),
+                                                                     self.backgroundColor.blue()]
+            # self.updateStatus("Superpixel at x:%d y:%d removed" % (x, y))
         elif self.clusterButton == 1:
             self.updateStatus("updating add cluster")
             label, x, y = self.getLabel(self.clusterPosition)
-            indices = np.argwhere(self.regionSegments == label)
-            for i in range(0, len(indices)):
-                self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
-                                                                 self.currentColor.green(),
-                                                                 self.currentColor.blue()]
+            if label is not None:
+                indices = np.argwhere(self.regionSegments == label)
+                for i in range(0, len(indices)):
+                    self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
+                                                                     self.currentColor.green(),
+                                                                     self.currentColor.blue()]
         elif self.clusterButton == 2:
             self.updateStatus("updating sub cluster")
             label, x, y = self.getLabel(self.clusterPosition)
-            indices = np.argwhere(self.regionSegments == label)
-            for i in range(0, len(indices)):
-                self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(),
-                                                                 self.backgroundColor.green(),
-                                                                 self.backgroundColor.blue()]
+            if label is not None:
+                indices = np.argwhere(self.regionSegments == label)
+                for i in range(0, len(indices)):
+                    self.outputMask[indices[i][0]][indices[i][1]] = [self.backgroundColor.red(),
+                                                                     self.backgroundColor.green(),
+                                                                     self.backgroundColor.blue()]
         if not self.dirty:
             self.setDirty()
         self.undoAction.setEnabled(True)
