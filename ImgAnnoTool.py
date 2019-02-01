@@ -12,6 +12,7 @@
 
 import os
 import platform
+from copy import copy
 import sys
 import qrc_resources
 import numpy as np
@@ -159,6 +160,7 @@ class MainWindow(QMainWindow):
         self.chooseFFPointSpinBoxValue = None
 
         self.historyStack = []
+        self.redoStack = []
 
         # Define a QLabel to hold the image
         self.imageLabel = QLabel()
@@ -239,6 +241,7 @@ class MainWindow(QMainWindow):
         # Move file     = Ctrl+M
         # Save          = Ctrl+S
         # Undo          = Ctrl+Z
+        # Re-do         = Ctrl+Y
         # Quit          = Ctrl+Q
         # Zoom in       = Ctrl+=
         # Zoom out      = Ctrl+-
@@ -272,13 +275,16 @@ class MainWindow(QMainWindow):
                                            "move", "Move current file to done folder")
 
         self.saveAction = self.createAction("&Save...", self.saveFile, "Ctrl+S",
-                                       "save", "Save modified image")
+                                            "save", "Save modified image")
         self.saveAction.setEnabled(False)
 
         self.undoAction = self.createAction("&Undo...", self.undo, "Ctrl+Z",
                                             "undo", "Undo the last operation. "
                                             "NOTE: This operation is irreversible.")
+        self.redoAction = self.createAction("&Re-do...", self.redo, "Ctrl+Y",
+                                            "redo", "re-do the last undone operation.")
         self.undoAction.setEnabled(False)
+        self.redoAction.setEnabled(False)
 
         quitAction = self.createAction("&Quit...", self.close, "Ctrl+Q",
                                        "close", "Close the application")
@@ -492,7 +498,7 @@ class MainWindow(QMainWindow):
         self.fileMenu.setMaximumWidth(400)
 
         editMenu = self.menuBar().addMenu("&Edit")
-        self.addActions(editMenu, (self.undoAction, None, self.paletteAction, None,
+        self.addActions(editMenu, (self.undoAction, self.redoAction, None, self.paletteAction, None,
                                    self.confirmAction, self.deleteAction, self.floodFillAction,
                                    None, self.mouseAction, self.rectLabelAction,
                                    self.ellipseLabelAction, self.polygonLabelAction))
@@ -512,7 +518,7 @@ class MainWindow(QMainWindow):
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self.toolBar.setObjectName("ToolBar")
         self.toolBarActions_1 = (fileOpenAction, dirOpenAction, self.saveAction, fileMoveAction, self.undoAction,
-                                 quitAction, self.clearAction, None, zoomInAction)
+                                 self.redoAction, quitAction, self.clearAction, None, zoomInAction)
         self.addActions(self.toolBar, self.toolBarActions_1)
         self.toolBar.addWidget(self.zoomSpinBox)
 
@@ -580,8 +586,32 @@ class MainWindow(QMainWindow):
         self.workerCluster.signals.progress.connect(self.loadedCluster)
         self.threadpool.start(self.workerCluster)
 
+        self.keys = {}
+
+        for key, value in vars(Qt).iteritems():
+            if isinstance(value, Qt.Key):
+                self.keys[key] = value
+                self.keys[value] = [key, 0]
+
 ###############################################################################
 ###############################################################################
+
+    def keyReleaseEvent(self, event):
+        if not event.isAutoRepeat():
+            # self.updateStatus("Key Released: ")
+            key = self.keys[event.key()]
+            key[1] = 0
+            self.keys[event.key()] = key
+            # self.updateStatus(str(self.keys[event.key()]))
+
+    def keyPressEvent(self, event):
+        if not event.isAutoRepeat():
+            # self.updateStatus("Key Pressed: ")
+            key = self.keys[event.key()]
+            key[1] = 1
+            self.keys[event.key()] = key
+            self.updateStatus(str(self.keys[event.key()]))
+
 
     def labelDialog(self):
         text, result = QInputDialog.getText(self, 'Sematic label Name', 'Enter label name: ')
@@ -598,7 +628,9 @@ class MainWindow(QMainWindow):
         self.dirty = False
         self.saveAction.setEnabled(False)
         self.historyStack = []
+        self.redoStack = []
         self.undoAction.setEnabled(False)
+        self.redoAction.setEnabled(False)
 
     def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal="triggered()"):
         """Quickly create action"""
@@ -1306,12 +1338,25 @@ class MainWindow(QMainWindow):
 
     def undo(self):
         """Undo the last changes to the image"""
+        self.redoStack.append(self.outputMask.copy())
+        self.redoAction.setEnabled(True)
         old = self.historyStack.pop(-1)
         self.outputMask = old
         self.showImage()
         self.updateStatus("Undo")
         if len(self.historyStack) == 0:
             self.undoAction.setEnabled(False)
+
+    def redo(self):
+        """Undo the last changes to the image"""
+        self.historyStack.append(self.outputMask.copy())
+        self.undoAction.setEnabled(True)
+        new = self.redoStack.pop(-1)
+        self.outputMask = new
+        self.showImage()
+        self.updateStatus("Re-do")
+        if len(self.redoStack) == 0:
+            self.redoAction.setEnabled(False)
 
     def updateAlphaMaskNum(self):
         self.alphaMaskNum = self.alphaMaskSpinBox.value()
@@ -1435,6 +1480,9 @@ class MainWindow(QMainWindow):
         qp.setPen(Qt.DashLine)
         qp.drawPixmap(0, 0, QPixmap.fromImage(self.image))
 
+        if self.begin is None:
+            return
+
         if not self.mouseAction.isChecked():
             old_factor = self.lastSpinboxValue * 1.0 / 100
             factor = self.zoomSpinBox.value() * 1.0 / 100
@@ -1507,7 +1555,8 @@ class MainWindow(QMainWindow):
             self.imageLabel.mousePressEvent = self.startPoly
             self.imageLabel.mouseMoveEvent = self.doLabel
             self.imageLabel.mouseReleaseEvent = self.mouseReleasePoly
-            self.imageLabel.mouseDoubleClickEvent = self.finishPoly
+            # self.imageLabel.mouseDoubleClickEvent = self.finishPoly
+            self.begin = None
 
     def mouseReleasePoly(self, event):
         pass
@@ -1516,19 +1565,56 @@ class MainWindow(QMainWindow):
         """Start labelling polygon"""
         self.imageLabel.setMouseTracking(True)
         self.lastSpinboxValue = self.zoomSpinBox.value()
+
+        if self.begin is None:
+            self.begin = event.pos()
+            self.end = event.pos()
+            self.points.append(self.begin)
+
         if self.finishChoosingArea:
             self.lines = []
             self.points = []
+            self.begin = event.pos()
+            self.points.append(self.begin)
             self.finishChoosingArea = False
+
         self.notFinishAreaChoosing()
         self.isLaballing = True
-        self.end = event.pos()
-        if self.end != self.begin:
-            self.points.append(self.begin)
-        if len(self.points) > 1:
-            self.lines.append(QLine(self.begin, self.end))
-        self.begin = event.pos()
-        self.imageLabel.update()
+        key = self.keys[self.keys["Key_Escape"]]
+        if not key[1] == 1:
+            key = self.keys[self.keys["Key_Control"]]
+            to_pop = key[1] == 1
+            self.end = event.pos()
+
+            if not to_pop:
+                if not self.end == self.begin:
+                    self.points.append(self.begin)
+
+                if len(self.points) > 1:
+                    self.lines.append(QLine(self.begin, self.end))
+
+                self.begin = event.pos()
+            else:
+                if len(self.lines) > 0:
+                    self.begin = self.lines[-1].p1()
+                    self.lines.pop()
+
+                if len(self.points) > 0 and (self.begin == self.points[-1] or len(self.lines == 0)):
+                    self.points.pop()
+
+                if len(self.points) == 0:
+                    self.begin = None
+                    self.end = None
+        else:
+            self.lines = []
+            self.points = []
+            self.begin = None
+            self.end = None
+
+        if self.begin is not None:
+            self.imageLabel.update()
+        if event.button() == 2:
+            self.finishPoly(event)
 
     def finishPoly(self, event):
         """Finish labelling polygon"""
@@ -1610,7 +1696,7 @@ class MainWindow(QMainWindow):
         return
 
     def openLabels(self):
-        updateStatus(self.filename)
+        self.updateStatus(self.filename)
         self.colourLabels = config.getLabelColor(self.filename)
         if self.colourLabels is None:
             imgRoot = os.path.dirname(self.filename)
@@ -1815,7 +1901,6 @@ class MainWindow(QMainWindow):
         self.addCluster()
 
     def stopClusterAdd(self, event):
-        """Finish labelling sp"""
         self.imageLabel.setMouseTracking(False)
         self.cluster_queue = []
         self.clusterButton = 0
@@ -1954,6 +2039,8 @@ class MainWindow(QMainWindow):
 
         copy = self.outputMask.copy()
         self.historyStack.append(copy)
+        self.redoStack = []
+        self.redoAction.setEnabled(False)
 
         factor = self.lastSpinboxValue * 1.0 / 100
         topleft_x = int(round(self.begin.x() / factor))
@@ -2064,6 +2151,7 @@ class MainWindow(QMainWindow):
         if not self.dirty:
             self.setDirty()
         self.undoAction.setEnabled(True)
+        self.begin = None
 
     def clearLabel(self):
         if self.dirty:
