@@ -243,9 +243,10 @@ class MainWindow(QMainWindow):
         # Undo          = Ctrl+Z
         # Re-do         = Ctrl+Y
         # Quit          = Ctrl+Q
+        # Palette       = Ctrl+L
+        # Colour Picker = Ctrl+P
         # Zoom in       = Ctrl+=
         # Zoom out      = Ctrl+-
-        # Hide Log      = Ctrl+L
         # Hide Image    = Ctrl+1
         # Hide Mask     = Ctrl+2
         # Hide Sp       = Ctrl+3
@@ -264,6 +265,7 @@ class MainWindow(QMainWindow):
         # Run Cluster   = Alt+C
         # Run SP        = Alt+S
         # Clear         = Alt+X
+        # Hide Log      = Alt+L
         # ###
 
         # Create actions
@@ -295,7 +297,6 @@ class MainWindow(QMainWindow):
         hideLogViewerAction = self.createAction("&Hide Log...", self.hideLog, "Alt+L",
                                                 None, "Hide log dock")
 
-
         self.hideOriginalAction = self.createAction("&Hide\nImage", self.hideButtonClick, "Ctrl+1",
                                                     "hide", "Hide original image", True, "toggled(bool)")
         self.hideMaskAction = self.createAction("&Hide\nMask", self.hideButtonClick, "Ctrl+2",
@@ -304,10 +305,13 @@ class MainWindow(QMainWindow):
         self.hideMaskAction.setChecked(False)
 
         self.paletteAction = self.createAction("&Palette...", self.chooseColor, "Ctrl+L",
-                                               None, "Choose the color to label items")
+                                               None, "Choose the colour to label items")
+
+        # self.pickerAction = self.createAction("&Colour Picker...", self.pickColor, "Ctrl+P",
+        #                                        "picker", "Picker the colour from mask")
 
         self.confirmAction = self.createAction("&Confirm...", self.confirmEdit, QKeySequence.InsertParagraphSeparator,
-                                          "done", "Fill in the area with selected color")
+                                          "done", "Fill in the area with selected colour")
         self.confirmAction.setEnabled(False)
         self.deleteAction = self.createAction("&Unlabel...", self.deleteLabel, "Del",
                                          "delete", "Delete area and make it background")
@@ -378,7 +382,7 @@ class MainWindow(QMainWindow):
                                                             "hide", "Show cluster outline overlay", True,
                                                             "toggled(bool)")
         self.clusterPaletteAction = self.createAction("&Change Outline\nColour", self.chooseOutlineColor, "Ctrl+7",
-                                                      None, "Choose the color to label items")
+                                                      None, "Choose the colour to label items")
         clusterGroup.addAction(self.clusterPaletteAction)
         self.clusterPaletteAction.setEnabled(False)
 
@@ -402,7 +406,7 @@ class MainWindow(QMainWindow):
         self.labelAddAction.setEnabled(False)
 
         self.labelPaletteAction = self.createAction("&Choose Label\nColour", self.chooseLabelColor, "Ctrl+L",
-                                                    None, "Choose the color to label items")
+                                                    None, "Choose the colour to label items")
         labelGroup.addAction(self.labelPaletteAction)
         self.labelPaletteAction.setEnabled(False)
 
@@ -498,7 +502,8 @@ class MainWindow(QMainWindow):
         self.fileMenu.setMaximumWidth(400)
 
         editMenu = self.menuBar().addMenu("&Edit")
-        self.addActions(editMenu, (self.undoAction, self.redoAction, None, self.paletteAction, None,
+        # self.addActions(editMenu, (self.undoAction, self.redoAction, None, self.paletteAction, self.pickerAction, None,
+        self.addActions(editMenu, (self.undoAction, self.redoAction, None, self.paletteAction , None,
                                    self.confirmAction, self.deleteAction, self.floodFillAction,
                                    None, self.mouseAction, self.rectLabelAction,
                                    self.ellipseLabelAction, self.polygonLabelAction))
@@ -542,7 +547,7 @@ class MainWindow(QMainWindow):
         #                          self.clusterSubAction, None)
         self.addActions(self.toolBar, self.toolBarActions_4)
 
-        self.colorLabelBar = QToolBar("Labels and colors")
+        self.colorLabelBar = QToolBar("Labels and colours")
         self.addToolBar(Qt.LeftToolBarArea, self.colorLabelBar)
         self.colorLabelBar.setObjectName("LabelToolBar")
         self.colorLabelBar.setIconSize(QSize(36, 36))
@@ -606,12 +611,11 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self, event):
         if not event.isAutoRepeat():
-            # self.updateStatus("Key Pressed: ")
             key = self.keys[event.key()]
             key[1] = 1
             self.keys[event.key()] = key
-            self.updateStatus(str(self.keys[event.key()]))
-
+            # self.updateStatus("Key Pressed: ")
+            # self.updateStatus(str(self.keys[event.key()]))
 
     def labelDialog(self):
         text, result = QInputDialog.getText(self, 'Sematic label Name', 'Enter label name: ')
@@ -723,7 +727,7 @@ class MainWindow(QMainWindow):
 
                 count += 1
                 action = self.createAction(label, self.chooseColor_2, shortcut,
-                                           None, "Color the label with user specified color",
+                                           None, "Colour the label with user specified colour",
                                            True, "toggled(bool)")
                 icon = QPixmap(50, 50)
                 icon.fill(self.colourLabels[label])
@@ -1562,6 +1566,9 @@ class MainWindow(QMainWindow):
         pass
 
     def startPoly(self, event):
+        if self.keys[self.keys["Key_Alt"]][1] == 1:
+            self.pickColor(event.pos())
+            return
         """Start labelling polygon"""
         self.imageLabel.setMouseTracking(True)
         self.lastSpinboxValue = self.zoomSpinBox.value()
@@ -1890,6 +1897,9 @@ class MainWindow(QMainWindow):
 
     def startClusterAdd(self, event):
         """Start labelling cluster"""
+        if self.keys[self.keys["Key_Alt"]][1] == 1:
+            self.pickColor(event.pos())
+            return
         self.clusterButton = event.button()
         self.imageLabel.setMouseTracking(True)
         self.isLaballing = True
@@ -1897,6 +1907,8 @@ class MainWindow(QMainWindow):
         self.addCluster()
 
     def DragClusterADD(self, event):
+        if self.keys[self.keys["Key_Alt"]][1] == 1:
+            return
         self.clusterPosition = event.pos()
         self.addCluster()
 
@@ -1906,6 +1918,12 @@ class MainWindow(QMainWindow):
         self.clusterButton = 0
         #self.confirmEdit()
         #self.showImage()
+
+    def getColour(self, pos):
+        factor = self.zoomSpinBox.value() * 1.0 / 100.0
+        x = int(round(pos.x() / factor))
+        y = int(round(pos.y() / factor))
+        return self.outputMask[y][x]
 
     def getLabel(self, pos):
         factor = self.zoomSpinBox.value() * 1.0 / 100.0
@@ -1932,6 +1950,10 @@ class MainWindow(QMainWindow):
 
     def startSPAdd(self, event):
         """Start labelling sp"""
+        if self.keys[self.keys["Key_Alt"]][1] == 1:
+            self.pickColor(event.pos())
+            return
+
         self.spButton = event.button()
 
         self.imageLabel.setMouseTracking(True)
@@ -1941,6 +1963,8 @@ class MainWindow(QMainWindow):
         self.addSP()
 
     def DragSPADD(self, event):
+        if self.keys[self.keys["Key_Alt"]][1] == 1:
+            return
         self.spPosition = event.pos()
         self.addSP()
 
@@ -1989,6 +2013,9 @@ class MainWindow(QMainWindow):
 
     def startLabel(self, event):
         """Start labelling rectangle or ecllipse"""
+        if self.keys[self.keys["Key_Alt"]][1] == 1:
+            self.pickColor(event.pos())
+            return
         self.isLaballing = True
         self.notFinishAreaChoosing()
         self.lastSpinboxValue = self.zoomSpinBox.value()
@@ -2043,10 +2070,11 @@ class MainWindow(QMainWindow):
         self.redoAction.setEnabled(False)
 
         factor = self.lastSpinboxValue * 1.0 / 100
-        topleft_x = int(round(self.begin.x() / factor))
-        topleft_y = int(round(self.begin.y() / factor))
-        bottomright_x = int(round(self.end.x() / factor))
-        bottomright_y = int(round(self.end.y() / factor))
+        if self.rectLabelAction.isChecked() or self.ellipseLabelAction.isChecked():
+            topleft_x = int(round(self.begin.x() / factor))
+            topleft_y = int(round(self.begin.y() / factor))
+            bottomright_x = int(round(self.end.x() / factor))
+            bottomright_y = int(round(self.end.y() / factor))
 
         if self.floodFillAction.isChecked():
             self.choosingPointFF = False
@@ -2296,10 +2324,10 @@ class MainWindow(QMainWindow):
 
     def chooseOutlineColor(self):
         color = self.colorDialog.getColor(self.currentOutlineColor,
-                                          "Choose outline color", config.DEFAULT_FILLING_COLOR)
+                                          "Choose outline colour", config.DEFAULT_FILLING_COLOR)
         if color:
             self.currentOutlineColor = color
-            self.updateStatus("Choose a new color")
+            self.updateStatus("Choose a new colour")
             icon = QPixmap(50, 50)
             icon.fill(self.currentOutlineColor)
             self.clusterPaletteAction.setIcon(QIcon(icon))
@@ -2308,21 +2336,29 @@ class MainWindow(QMainWindow):
     def chooseLabelColor(self):
         """Use a palette to choose labelling color"""
         color = self.colorDialog.getColor(self.currentLabelColor,
-                                "Choose labelling color", config.DEFAULT_FILLING_COLOR)
+                                "Choose labelling colour", config.DEFAULT_FILLING_COLOR)
         if color:
             self.currentLabelColor = color
-            self.updateStatus("Choose a new color")
+            self.updateStatus("Choose a new colour")
             icon = QPixmap(50, 50)
             icon.fill(self.currentLabelColor)
             self.labelPaletteAction.setIcon(QIcon(icon))
 
-    def chooseColor(self):
+    def pickColor(self, pos):
+        self.updateStatus("Pick colour")
+        colour = self.getColour(pos)
+        colour = QColor(colour[0], colour[1], colour[2])
+        self.chooseColor(colour)
+
+    def chooseColor(self, color=None):
         """Use a palette to choose labelling color"""
-        color = self.colorDialog.getColor(self.currentColor,
-                                "Choose labelling color", config.DEFAULT_FILLING_COLOR)
+        if color is None:
+            color = self.colorDialog.getColor(self.currentColor,
+                                              "Choose labelling colour", config.DEFAULT_FILLING_COLOR)
+        print color
         if color:
             self.currentColor = color
-            self.updateStatus("Choose a new color")
+            self.updateStatus("Choose a new colour")
             icon = QPixmap(50, 50)
             icon.fill(self.currentColor)
             self.paletteAction.setIcon(QIcon(icon))
@@ -2453,7 +2489,7 @@ class MainWindow(QMainWindow):
                           <b>Usage:</b>
                           <ol>
                           <li>Open a directory or an image.</li>
-                          <li>Choose color.</li>
+                          <li>Choose colour.</li>
                           <li>Choose a shape and region.</li>
                           <li>Confirm, unlabel or perform flood-fill.</li> 
                           <li>Save image when finish annotating.</li>
