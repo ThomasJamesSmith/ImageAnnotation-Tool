@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         self.hideSP = False
         self.spButton = 0
         self.clusterButton = 0
+        self.floodMask = False
         self.hideCluster = False
         self.showSuggestedCluster = False
         self.showClusterOutlines = False
@@ -1950,6 +1951,10 @@ class MainWindow(QMainWindow):
 
     def startSPAdd(self, event):
         """Start labelling sp"""
+        self.isLaballing = True
+        if self.keys[self.keys["Key_Control"]][1] == 1:
+            self.floodMaskInit(event.pos())
+            return
         if self.keys[self.keys["Key_Alt"]][1] == 1:
             self.pickColor(event.pos())
             return
@@ -1958,13 +1963,13 @@ class MainWindow(QMainWindow):
 
         self.imageLabel.setMouseTracking(True)
         self.lastSpinboxValue = self.zoomSpinBox.value()
-        self.isLaballing = True
         self.spPosition = event.pos()
         self.addSP()
 
     def DragSPADD(self, event):
-        if self.keys[self.keys["Key_Alt"]][1] == 1:
+        if self.keys[self.keys["Key_Alt"]][1] == 1 or self.keys[self.keys["Key_Control"]][1] == 1:
             return
+
         self.spPosition = event.pos()
         self.addSP()
 
@@ -2140,6 +2145,12 @@ class MainWindow(QMainWindow):
             self.showImage()
             self.notFinishAreaChoosing()
             self.updateStatus("Label selected polygon area")
+        elif self.floodMask:
+            indices = np.argwhere(self.floodMaskMask == 1)
+            for i in range(0, len(indices)):
+                self.outputMask[indices[i][0]][indices[i][1]] = [self.currentColor.red(),
+                                                                 self.currentColor.green(), self.currentColor.blue()]
+            self.floodMask = False
         elif self.spButton == 1:  # self.spAddAction.isChecked():
             label, x, y = self.getLabel(self.spPosition)
             if label is not None:
@@ -2343,6 +2354,60 @@ class MainWindow(QMainWindow):
             icon = QPixmap(50, 50)
             icon.fill(self.currentLabelColor)
             self.labelPaletteAction.setIcon(QIcon(icon))
+
+    def floodMaskInit(self, pos):
+        self.updateStatus("Flood")
+        self.floodMask = True
+        colour = self.getColour(pos)
+        self.floodMaskMask = np.zeros((self.outputMask.shape[0], self.outputMask.shape[1]))
+        factor = self.zoomSpinBox.value() * 1.0 / 100.0
+        x = int(round(pos.x() / factor))
+        y = int(round(pos.y() / factor))
+        floodQueue = []
+        floodQueue.append([y, x])
+        self.floodMaskMask[y][x] = 1
+
+        while len(floodQueue) > 0:
+            cy = floodQueue[0][0]
+            cx = floodQueue[0][1]
+            print(cx, cy)
+            #
+            if (self.outputMask[cy+1][cx] == colour).all() and self.floodMaskMask[cy+1][cx] == 0:
+                floodQueue.append([cy+1, cx])
+                self.floodMaskMask[cy+1][cx] = 1
+            #
+            if (self.outputMask[cy-1][cx] == colour).all() and self.floodMaskMask[cy-1][cx] == 0:
+                floodQueue.append([cy-1, cx])
+                self.floodMaskMask[cy-1][cx] = 1
+            #
+            if (self.outputMask[cy][cx+1] == colour).all() and self.floodMaskMask[cy][cx+1] == 0:
+                floodQueue.append([cy, cx+1])
+                self.floodMaskMask[cy][cx+1] = 1
+            #
+            if (self.outputMask[cy][cx-1] == colour).all() and self.floodMaskMask[cy][cx-1] == 0:
+                floodQueue.append([cy, cx-1])
+                self.floodMaskMask[cy][cx-1] = 1
+            #
+            if (self.outputMask[cy + 1][cx+1] == colour).all() and self.floodMaskMask[cy + 1][cx+1] == 0:
+                floodQueue.append([cy + 1, cx+1])
+                self.floodMaskMask[cy + 1][cx+1] = 1
+            #
+            if (self.outputMask[cy + 1][cx-1] == colour).all() and self.floodMaskMask[cy + 1][cx-1] == 0:
+                floodQueue.append([cy + 1, cx-1])
+                self.floodMaskMask[cy + 1][cx-1] = 1
+            #
+            if (self.outputMask[cy - 1][cx+1] == colour).all() and self.floodMaskMask[cy - 1][cx+1] == 0:
+                floodQueue.append([cy - 1, cx+1])
+                self.floodMaskMask[cy - 1][cx+1] = 1
+            #
+            if (self.outputMask[cy - 1][cx+1] == colour).all() and self.floodMaskMask[cy - 1][cx+1] == 0:
+                floodQueue.append([cy - 1, cx+1])
+                self.floodMaskMask[cy - 1][cx + 1] = 1
+
+            floodQueue.pop(0)
+        # apply mask to output mask
+        self.confirmEdit()
+        self.showImage()
 
     def pickColor(self, pos):
         self.updateStatus("Pick colour")
