@@ -462,13 +462,33 @@ class MainWindow(QMainWindow):
 
         self.spSpinBox = QSpinBox()
         self.spSpinBox.setRange(50, 5000)
-        self.spSpinBox.setValue(2000)
+        self.spSpinBox.setSingleStep(50)
+        self.spSpinBox.setValue(1500)
         self.spSpinBox.setToolTip("Set number of Superpixels")
         self.spSpinBox.setStatusTip(self.spSpinBox.toolTip())
         self.spSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self.connect(self.spSpinBox,
-                     SIGNAL("valueChanged(int)"), self.updateSPNum)
+        self.connect(self.spSpinBox, SIGNAL("valueChanged(int)"), self.updateSPNum)
+
+        self.sigmaSpinBox = QSpinBox()
+        self.sigmaSpinBox.setRange(1, 10)
+        self.sigmaSpinBox.setValue(2)
+        self.sigmaSpinBox.setToolTip("Set Sigma")
+        self.sigmaSpinBox.setStatusTip(self.sigmaSpinBox.toolTip())
+        self.sigmaSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.sigmaSpinBox, SIGNAL("valueChanged(int)"), self.updateSPSigma)
+
+        self.compSpinBox = QSpinBox()
+        self.compSpinBox.setRange(-100, 100)
+        self.compSpinBox.setSingleStep(10)
+        self.compSpinBox.setValue(10)
+        self.compSpinBox.setToolTip("Set Compactness")
+        self.compSpinBox.setStatusTip(self.compSpinBox.toolTip())
+        self.compSpinBox.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.connect(self.compSpinBox, SIGNAL("valueChanged(int)"), self.updateSPCompactness)
+
         self.spNum = self.spSpinBox.value()
+        self.sigma = self.sigmaSpinBox.value()
+        self.compactness = self.compSpinBox.value()
 
         self.alphaMaskSpinBox = QDoubleSpinBox()
         self.alphaMaskSpinBox.setRange(0, 1)
@@ -531,6 +551,9 @@ class MainWindow(QMainWindow):
         self.toolBarActions_2 = (zoomOutAction, None, self.hideOriginalAction, self.hideMaskAction,
                                  self.hidespAction, self.hideClusterAction, self.showSuggestedClusterAction,
                                  self.showClusterOutlinesAction, self.clusterPaletteAction, None)
+        # self.toolBarActions_2 = (zoomOutAction, None, self.hideOriginalAction, self.hideMaskAction,
+        #                          self.hidespAction, self.clusterPaletteAction, None)
+
         self.addActions(self.toolBar, self.toolBarActions_2)
         self.toolBar.addWidget(self.alphaMaskSpinBox)
         self.toolBar.addWidget(self.alphaClusterSpinBox)
@@ -541,11 +564,14 @@ class MainWindow(QMainWindow):
                                  self.ellipseLabelAction, self.polygonLabelAction, None)
         self.addActions(self.toolBar, self.toolBarActions_3)
         self.toolBar.addWidget(self.spSpinBox)
+        self.toolBar.addWidget(self.sigmaSpinBox)
+        self.toolBar.addWidget(self.compSpinBox)
 
-        # self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, self.spSubAction, None,
+
         self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, None,
                                  self.clusterAction, self.clusterMouseAction, self.clusterAddAction, None)
-        #                          self.clusterSubAction, None)
+        # self.toolBarActions_4 = (self.spAction, self.spMouseAction, self.spAddAction, None)
+
         self.addActions(self.toolBar, self.toolBarActions_4)
 
         self.colorLabelBar = QToolBar("Labels and colours")
@@ -1365,14 +1391,29 @@ class MainWindow(QMainWindow):
 
     def updateAlphaMaskNum(self):
         self.alphaMaskNum = self.alphaMaskSpinBox.value()
+        self.updateStatus("Alpha Mask: " + str(self.alphaMaskNum))
         self.showImage()
 
     def updateAlphaClusterNum(self):
         self.alphaClusterNum = self.alphaClusterSpinBox.value()
+        self.updateStatus("Alpha Cluster: " + str(self.alphaClusterNum))
         self.showImage()
 
     def updateSPNum(self):
         self.spNum = self.spSpinBox.value()
+        self.updateStatus("# Superpixels: " + str(self.spNum))
+        self.spAction.setEnabled(True)
+
+    def updateSPSigma(self):
+        self.sigma = self.sigmaSpinBox.value()
+        self.updateStatus("Sigma: " + str(self.sigma))
+        self.spAction.setEnabled(True)
+
+    def updateSPCompactness(self):
+        if self.compSpinBox.value == 0.0:
+            self.compSpinBox.value = 10.0
+        self.compactness = self.compSpinBox.value()
+        self.updateStatus("Compactness: " + str(self.compactness))
         self.spAction.setEnabled(True)
 
     def runMassSuperpixelQueue(self, q, progress_callback):
@@ -1410,7 +1451,8 @@ class MainWindow(QMainWindow):
             os.makedirs(config.outputDir(dir))
             
         output = np.zeros(img.shape, np.uint8)
-        segments = slic(img, n_segments=self.spNum, sigma=1, compactness=30)
+        segments = slic(img, n_segments=self.spNum, sigma=self.sigma, compactness=self.compactness)
+        self.updateStatus("Actual # Superpixels: " + str(segments.max()))
         path = config.outputFile(dir)
         pathSplit = path.split('.')
         np.savetxt(pathSplit[0] + ".csv", segments, delimiter=",", fmt="%d")        
@@ -1519,7 +1561,7 @@ class MainWindow(QMainWindow):
         self.spAddAction.setEnabled(True)
         # self.spSubAction.setEnabled(True)
         self.hidespAction.setEnabled(True)
-        self.spAction.setEnabled(False)
+        # self.spAction.setEnabled(False)
         self.spAddAction.setChecked(True)
         self.clusterPaletteAction.setEnabled(True)
 
@@ -1590,8 +1632,9 @@ class MainWindow(QMainWindow):
         self.isLaballing = True
         key = self.keys[self.keys["Key_Escape"]]
         if not key[1] == 1:
-            key = self.keys[self.keys["Key_Control"]]
-            to_pop = key[1] == 1
+            # key = self.keys[self.keys["Key_Control"]]
+            # to_pop = key[1] == 1
+            to_pop = event.button() == 2
             self.end = event.pos()
 
             if not to_pop:
@@ -1621,7 +1664,9 @@ class MainWindow(QMainWindow):
 
         if self.begin is not None:
             self.imageLabel.update()
-        if event.button() == 2:
+        # if event.button() == 2:
+        key = self.keys[self.keys["Key_Control"]]
+        if key[1] == 1:
             self.finishPoly(event)
 
     def finishPoly(self, event):
@@ -2370,42 +2415,59 @@ class MainWindow(QMainWindow):
         while len(floodQueue) > 0:
             cy = floodQueue[0][0]
             cx = floodQueue[0][1]
-            print(cx, cy)
-            #
-            if (self.outputMask[cy+1][cx] == colour).all() and self.floodMaskMask[cy+1][cx] == 0:
+            # cy + 1
+            if cy + 1 < self.outputMask.shape[0] and \
+                    (self.outputMask[cy+1][cx] == colour).all() and \
+                    self.floodMaskMask[cy+1][cx] == 0:
                 floodQueue.append([cy+1, cx])
                 self.floodMaskMask[cy+1][cx] = 1
-            #
-            if (self.outputMask[cy-1][cx] == colour).all() and self.floodMaskMask[cy-1][cx] == 0:
+            # cy - 1
+            if cy - 1 > 0 and \
+                    (self.outputMask[cy-1][cx] == colour).all() and \
+                    self.floodMaskMask[cy-1][cx] == 0:
                 floodQueue.append([cy-1, cx])
                 self.floodMaskMask[cy-1][cx] = 1
-            #
-            if (self.outputMask[cy][cx+1] == colour).all() and self.floodMaskMask[cy][cx+1] == 0:
+            # cx + 1
+            if cx + 1 < self.outputMask.shape[1] and \
+                    (self.outputMask[cy][cx+1] == colour).all() and \
+                    self.floodMaskMask[cy][cx+1] == 0:
                 floodQueue.append([cy, cx+1])
                 self.floodMaskMask[cy][cx+1] = 1
-            #
-            if (self.outputMask[cy][cx-1] == colour).all() and self.floodMaskMask[cy][cx-1] == 0:
+            # cx - 1
+            if cx - 1 > 0 and \
+                    (self.outputMask[cy][cx-1] == colour).all() and \
+                    self.floodMaskMask[cy][cx-1] == 0:
                 floodQueue.append([cy, cx-1])
                 self.floodMaskMask[cy][cx-1] = 1
-            #
-            if (self.outputMask[cy + 1][cx+1] == colour).all() and self.floodMaskMask[cy + 1][cx+1] == 0:
-                floodQueue.append([cy + 1, cx+1])
-                self.floodMaskMask[cy + 1][cx+1] = 1
-            #
-            if (self.outputMask[cy + 1][cx-1] == colour).all() and self.floodMaskMask[cy + 1][cx-1] == 0:
-                floodQueue.append([cy + 1, cx-1])
-                self.floodMaskMask[cy + 1][cx-1] = 1
-            #
-            if (self.outputMask[cy - 1][cx+1] == colour).all() and self.floodMaskMask[cy - 1][cx+1] == 0:
-                floodQueue.append([cy - 1, cx+1])
-                self.floodMaskMask[cy - 1][cx+1] = 1
-            #
-            if (self.outputMask[cy - 1][cx+1] == colour).all() and self.floodMaskMask[cy - 1][cx+1] == 0:
-                floodQueue.append([cy - 1, cx+1])
-                self.floodMaskMask[cy - 1][cx + 1] = 1
+            # cy + 1, cx + 1
+            if cy + 1 < self.outputMask.shape[0] and cx + 1 < self.outputMask.shape[1] and \
+                    (self.outputMask[cy+1][cx+1] == colour).all() and \
+                    self.floodMaskMask[cy+1][cx+1] == 0:
+                floodQueue.append([cy+1, cx+1])
+                self.floodMaskMask[cy+1][cx+1] = 1
+            # cy + 1, cx - 1
+            if cy + 1 < self.outputMask.shape[0] and cx - 1 > 0 and \
+                    (self.outputMask[cy+1][cx-1] == colour).all() and \
+                    self.floodMaskMask[cy+1][cx-1] == 0:
+                floodQueue.append([cy+1, cx-1])
+                self.floodMaskMask[cy+1][cx-1] = 1
+            # cy - 1, cx + 1
+            if cy - 1 > 0 and cx + 1 < self.outputMask.shape[1] and \
+                    (self.outputMask[cy-1][cx+1] == colour).all() and \
+                    self.floodMaskMask[cy-1][cx+1] == 0:
+                floodQueue.append([cy-1, cx+1])
+                self.floodMaskMask[cy-1][cx+1] = 1
+            # cy - 1, cx - 1
+            if cy - 1 > 0 and cx + 1 > 0 and \
+                    (self.outputMask[cy-1][cx-1] == colour).all() and \
+                    self.floodMaskMask[cy-1][cx-1] == 0:
+                floodQueue.append([cy-1, cx-1])
+                self.floodMaskMask[cy-1][cx-1] = 1
 
             floodQueue.pop(0)
         # apply mask to output mask
+        self.updateStatus("flood finished")
+        cv2.imwrite("flood_test.png", self.floodMaskMask*255)
         self.confirmEdit()
         self.showImage()
 
