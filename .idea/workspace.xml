@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="f1e06e3a-26c9-47b0-88c8-6e61c1927c82" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ImgAnnoTool.py" beforeDir="false" afterPath="$PROJECT_DIR$/ImgAnnoTool.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/flood_test.png" beforeDir="false" afterPath="$PROJECT_DIR$/flood_test.png" afterDir="false" />
     </list>
@@ -37,8 +36,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ImgAnnoTool.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="222">
-              <caret line="1659" lean-forward="true" selection-start-line="1659" selection-end-line="1659" />
+            <state relative-caret-position="487">
+              <caret line="2522" column="26" selection-start-line="2522" selection-start-column="26" selection-end-line="2522" selection-end-column="26" />
               <folding>
                 <element signature="n#!!doc" />
                 <element signature="e#878#934#0" />
@@ -279,8 +278,6 @@
                 <element signature="e#85625#86073#0" />
                 <element signature="e#86104#86390#0" />
                 <element signature="e#86250#86302#0" />
-                <element signature="e#86433#86923#0" />
-                <element signature="e#86558#86608#0" />
                 <element signature="e#86673#86719#0" />
                 <element signature="e#86965#87134#0" />
                 <element signature="e#87176#87356#0" />
@@ -295,9 +292,7 @@
                 <element signature="e#89791#89901#0" />
                 <element signature="e#89976#90086#0" />
                 <element signature="e#90414#90700#0" />
-                <element signature="e#90737#97788#0" />
                 <element signature="e#91124#91355#0" />
-                <element signature="e#91414#93163#0" />
                 <element signature="e#93223#93642#0" />
                 <element signature="e#93363#93466#0" />
                 <element signature="e#93705#94238#0" />
@@ -306,8 +301,6 @@
                 <element signature="e#94364#94440#0" />
                 <element signature="e#94545#94645#0" />
                 <element signature="e#94886#95220#0" />
-                <element signature="e#94994#95185#0" />
-                <element signature="e#95042#95185#0" />
                 <element signature="e#95299#95837#0" />
                 <element signature="e#95394#95837#0" />
                 <element signature="e#95511#95665#0" />
@@ -358,16 +351,6 @@
                 <element signature="e#104092#104319#0" />
                 <element signature="e#104386#104838#0" />
                 <element signature="e#104617#104838#0" />
-                <element signature="e#104882#108075#0" />
-                <element signature="e#105349#107881#0" />
-                <element signature="e#105622#105700#0" />
-                <element signature="e#105895#105973#0" />
-                <element signature="e#106191#106269#0" />
-                <element signature="e#106464#106542#0" />
-                <element signature="e#106810#106892#0" />
-                <element signature="e#107137#107219#0" />
-                <element signature="e#107464#107546#0" />
-                <element signature="e#107768#107850#0" />
                 <element signature="e#108115#108274#0" />
                 <element signature="e#108323#109103#0" />
                 <element signature="e#108407#108562#0" />
@@ -421,7 +404,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>binar</find>
       <find>Picker</find>
       <find>normal</find>
       <find>normalise</find>
@@ -451,6 +433,7 @@
       <find>deac</find>
       <find>spDeactivate</find>
       <find>spAction</find>
+      <find>flood</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -720,12 +703,12 @@
       <workItem from="1560336123749" duration="671000" />
       <workItem from="1560785723971" duration="137000" />
       <workItem from="1561456962199" duration="20887000" />
-      <workItem from="1568646469680" duration="3916000" />
+      <workItem from="1568646469680" duration="5191000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="154911000" />
+    <option name="totallyTimeSpent" value="156186000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
@@ -794,7 +777,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/ImgAnnoTool.py</url>
-          <line>2655</line>
+          <line>2660</line>
           <option name="timeStamp" value="57" />
         </line-breakpoint>
       </breakpoints>
@@ -1147,8 +1130,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/ImgAnnoTool.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="222">
-          <caret line="1659" lean-forward="true" selection-start-line="1659" selection-end-line="1659" />
+        <state relative-caret-position="487">
+          <caret line="2522" column="26" selection-start-line="2522" selection-start-column="26" selection-end-line="2522" selection-end-column="26" />
           <folding>
             <element signature="n#!!doc" />
             <element signature="e#878#934#0" />
@@ -1389,8 +1372,6 @@
             <element signature="e#85625#86073#0" />
             <element signature="e#86104#86390#0" />
             <element signature="e#86250#86302#0" />
-            <element signature="e#86433#86923#0" />
-            <element signature="e#86558#86608#0" />
             <element signature="e#86673#86719#0" />
             <element signature="e#86965#87134#0" />
             <element signature="e#87176#87356#0" />
@@ -1405,9 +1386,7 @@
             <element signature="e#89791#89901#0" />
             <element signature="e#89976#90086#0" />
             <element signature="e#90414#90700#0" />
-            <element signature="e#90737#97788#0" />
             <element signature="e#91124#91355#0" />
-            <element signature="e#91414#93163#0" />
             <element signature="e#93223#93642#0" />
             <element signature="e#93363#93466#0" />
             <element signature="e#93705#94238#0" />
@@ -1416,8 +1395,6 @@
             <element signature="e#94364#94440#0" />
             <element signature="e#94545#94645#0" />
             <element signature="e#94886#95220#0" />
-            <element signature="e#94994#95185#0" />
-            <element signature="e#95042#95185#0" />
             <element signature="e#95299#95837#0" />
             <element signature="e#95394#95837#0" />
             <element signature="e#95511#95665#0" />
@@ -1468,16 +1445,6 @@
             <element signature="e#104092#104319#0" />
             <element signature="e#104386#104838#0" />
             <element signature="e#104617#104838#0" />
-            <element signature="e#104882#108075#0" />
-            <element signature="e#105349#107881#0" />
-            <element signature="e#105622#105700#0" />
-            <element signature="e#105895#105973#0" />
-            <element signature="e#106191#106269#0" />
-            <element signature="e#106464#106542#0" />
-            <element signature="e#106810#106892#0" />
-            <element signature="e#107137#107219#0" />
-            <element signature="e#107464#107546#0" />
-            <element signature="e#107768#107850#0" />
             <element signature="e#108115#108274#0" />
             <element signature="e#108323#109103#0" />
             <element signature="e#108407#108562#0" />

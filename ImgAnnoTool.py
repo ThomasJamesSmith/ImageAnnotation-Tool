@@ -2519,6 +2519,11 @@ class MainWindow(QMainWindow):
         factor = self.zoomSpinBox.value() * 1.0 / 100.0
         x = int(round(pos.x() / factor))
         y = int(round(pos.y() / factor))
+        current_colour = [self.currentColor.red(), self.currentColor.green(), self.currentColor.blue()]
+        if (current_colour == self.outputMask[y][x]).all():
+            self.updateStatus("Already this colour.")
+            return
+
         floodQueue = []
         floodQueue.append([y, x])
         self.floodMaskMask[y][x] = 1
@@ -2578,7 +2583,7 @@ class MainWindow(QMainWindow):
             floodQueue.pop(0)
         # apply mask to output mask
         self.updateStatus("flood finished")
-        cv2.imwrite("flood_test.png", self.floodMaskMask*255)
+        #cv2.imwrite("flood_test.png", self.floodMaskMask*255)
         self.confirmEdit()
         self.showImage()
 
