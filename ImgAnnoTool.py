@@ -1606,9 +1606,7 @@ class MainWindow(QMainWindow):
             self.begin = None
 
     def mouseReleasePoly(self, event):
-        pass
-
-    def startPoly(self, event):
+        #pass
         if self.keys[self.keys["Key_Alt"]][1] == 1:
             self.pickColor(event.pos())
             return
@@ -1635,7 +1633,118 @@ class MainWindow(QMainWindow):
             # key = self.keys[self.keys["Key_Control"]]
             # to_pop = key[1] == 1
             to_pop = event.button() == 2
+            x = event.pos().x()
+            y = event.pos().y()
+            if x > self.scrollArea.horizontalScrollBar().value() + self.scrollArea.width():
+                self.scrollArea.horizontalScrollBar().setValue(
+                    self.scrollArea.horizontalScrollBar().value() + 5)
+            elif x < self.scrollArea.horizontalScrollBar().value():
+                self.scrollArea.horizontalScrollBar().setValue(
+                    self.scrollArea.horizontalScrollBar().value() - 5)
+            if y > self.scrollArea.verticalScrollBar().value() + self.scrollArea.height():
+                self.scrollArea.verticalScrollBar().setValue(
+                    self.scrollArea.verticalScrollBar().value() + 5)
+            elif y < self.scrollArea.verticalScrollBar().value():
+                self.scrollArea.verticalScrollBar().setValue(
+                    self.scrollArea.verticalScrollBar().value() - 5)
+
+            if x > self.image.width():
+                x = self.image.width()
+            elif x < 0:
+                x = 0
+            if y > self.image.height():
+                y = self.image.height()
+            elif y < 0:
+                y = 0
+            self.end = QPoint(x, y)
+
+            if not to_pop:
+                if not self.end == self.begin:
+                    self.points.append(self.begin)
+
+                if len(self.points) > 1:
+                    self.lines.append(QLine(self.begin, self.end))
+
+                self.begin = QPoint(x, y)
+            else:
+                if len(self.lines) > 0:
+                    self.begin = self.lines[-1].p1()
+                    self.lines.pop()
+
+                if len(self.points) > 0 and (self.begin == self.points[-1] or len(self.lines == 0)):
+                    self.points.pop()
+
+                if len(self.points) == 0:
+                    self.begin = None
+                    self.end = None
+        else:
+            self.lines = []
+            self.points = []
+            self.begin = None
+            self.end = None
+
+        if self.begin is not None:
+            self.imageLabel.update()
+        # if event.button() == 2:
+        key = self.keys[self.keys["Key_Control"]]
+        if key[1] == 1:
+            self.finishPoly(event)
+
+    def startPoly(self, event):
+        pass
+        return
+        if self.keys[self.keys["Key_Alt"]][1] == 1:
+            self.pickColor(event.pos())
+            return
+        """Start labelling polygon"""
+        self.imageLabel.setMouseTracking(True)
+        self.lastSpinboxValue = self.zoomSpinBox.value()
+
+        if self.begin is None:
+            self.begin = event.pos()
             self.end = event.pos()
+            self.points.append(self.begin)
+
+        if self.finishChoosingArea:
+            self.lines = []
+            self.points = []
+            self.begin = event.pos()
+            self.points.append(self.begin)
+            self.finishChoosingArea = False
+
+        self.notFinishAreaChoosing()
+        self.isLaballing = True
+        key = self.keys[self.keys["Key_Escape"]]
+        if not key[1] == 1:
+            # key = self.keys[self.keys["Key_Control"]]
+            # to_pop = key[1] == 1
+
+            x = event.pos().x()
+            y = event.pos().y()
+            if x > self.scrollArea.horizontalScrollBar().value() + self.scrollArea.width():
+                self.scrollArea.horizontalScrollBar().setValue(
+                    self.scrollArea.horizontalScrollBar().value() + 5)
+            elif x < self.scrollArea.horizontalScrollBar().value():
+                self.scrollArea.horizontalScrollBar().setValue(
+                    self.scrollArea.horizontalScrollBar().value() - 5)
+            if y > self.scrollArea.verticalScrollBar().value() + self.scrollArea.height():
+                self.scrollArea.verticalScrollBar().setValue(
+                    self.scrollArea.verticalScrollBar().value() + 5)
+            elif y < self.scrollArea.verticalScrollBar().value():
+                self.scrollArea.verticalScrollBar().setValue(
+                    self.scrollArea.verticalScrollBar().value() - 5)
+
+            if x > self.image.width():
+                x = self.image.width()
+            elif x < 0:
+                x = 0
+            if y > self.image.height():
+                y = self.image.height()
+            elif y < 0:
+                y = 0
+            self.end = QPoint(x, y)
+            to_pop = event.button() == 2
+
 
             if not to_pop:
                 if not self.end == self.begin:
@@ -2075,6 +2184,7 @@ class MainWindow(QMainWindow):
 
     def doLabel(self, event):
         """Choose the area of rectangle or ecllipse"""
+        #self.updateStatus(str(event.pos()))
         x = event.pos().x()
         y = event.pos().y()
         if x > self.scrollArea.horizontalScrollBar().value() + self.scrollArea.width():
@@ -2099,6 +2209,7 @@ class MainWindow(QMainWindow):
         elif y < 0:
             y = 0
         self.end = QPoint(x, y)
+        self.updateStatus(str(x) + ", " + str(y))
         self.imageLabel.update()
 
     def finishLabel(self, event):
